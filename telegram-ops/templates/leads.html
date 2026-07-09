@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>线索池</h2>
+  <table>
+    <tr><th>ID</th><th>用户</th><th>规则</th><th>状态</th><th>消息</th><th>时间</th></tr>
+    {% for l in leads %}
+    <tr><td>{{ l.id }}</td><td>{{ l.telegram_user_id }} @{{ l.username or "" }}</td><td>{{ l.matched_rule_id }}</td><td>{{ l.status }}</td><td>{{ l.message_text }}</td><td>{{ l.created_at }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

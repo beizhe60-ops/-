@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>发送队列</h2>
+  <table>
+    <tr><th>ID</th><th>账号</th><th>类型</th><th>目标</th><th>状态</th><th>错误</th><th>时间</th></tr>
+    {% for j in jobs %}
+    <tr><td>{{ j.id }}</td><td>{{ j.account_id }}</td><td>{{ j.send_type }}</td><td>{{ j.destination_chat_id }}</td><td><span class="status {{ j.status }}">{{ j.status }}</span></td><td>{{ j.error or "" }}</td><td>{{ j.created_at }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

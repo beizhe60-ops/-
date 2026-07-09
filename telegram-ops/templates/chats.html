@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>群组/频道</h2>
+  <table>
+    <tr><th>ID</th><th>账号</th><th>Telegram Chat ID</th><th>标题</th><th>类型</th><th>监听</th><th>主监听</th><th>操作</th></tr>
+    {% for c in chats %}
+    <tr>
+      <td>{{ c.id }}</td><td>{{ c.account.name }}</td><td>{{ c.telegram_chat_id }}</td><td>{{ c.title }}</td>
+      <td>{{ c.type }}</td><td>{{ c.enabled }}</td><td>{{ c.is_primary_listener }}</td>
+      <td><form method="post" action="/chats/{{ c.id }}/toggle"><button>启用/禁用</button></form></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>发送日志</h2>
+  <table>
+    <tr><th>ID</th><th>队列</th><th>账号</th><th>规则</th><th>状态</th><th>错误</th><th>时间</th></tr>
+    {% for log in logs %}
+    <tr><td>{{ log.id }}</td><td>{{ log.queue_id }}</td><td>{{ log.account_id }}</td><td>{{ log.rule_id }}</td><td>{{ log.status }}</td><td>{{ log.error or "" }}</td><td>{{ log.created_at }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

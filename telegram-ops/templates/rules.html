@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>新增规则</h2>
+  <form method="post" action="/rules">
+    <div class="grid">
+      <label>名称<input name="name" required></label>
+      <label>匹配模式<select name="match_mode"><option value="keyword">keyword</option><option value="regex">regex</option></select></label>
+      <label>发送模式<select name="send_mode"><option value="record_only">record_only</option><option value="group_reply">group_reply</option><option value="private_message">private_message</option><option value="both">both</option></select></label>
+      <label>冷却秒数<input name="cooldown_seconds" type="number" value="86400"></label>
+      <label>每日上限<input name="daily_limit" type="number" value="50"></label>
+      <label><input type="checkbox" name="group_reply_enabled" value="true"> 群内回复</label>
+      <label><input type="checkbox" name="private_message_enabled" value="true"> 自动私信</label>
+      <label><input type="checkbox" name="enabled" value="true"> 启用规则</label>
+    </div>
+    <label>关键词 / 正则（逗号或换行分隔）<textarea name="keywords" required></textarea></label>
+    <label>回复模板（record_only 可不填；支持 $username, $user_id, $chat_id, $rule_name, $message_text）<textarea name="reply_template"></textarea></label>
+    <button>保存规则</button>
+  </form>
+</div>
+<div class="card">
+  <h2>规则列表</h2>
+  <table>
+    <tr><th>ID</th><th>名称</th><th>模式</th><th>发送</th><th>启用</th><th>操作</th></tr>
+    {% for r in rules %}
+    <tr>
+      <td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.match_mode }}</td>
+      <td>{{ r.send_mode }}<br><span class="muted">group={{ r.group_reply_enabled }}, private={{ r.private_message_enabled }}</span></td>
+      <td>{{ r.enabled }}</td>
+      <td><form method="post" action="/rules/{{ r.id }}/toggle"><button>启用/禁用</button></form></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

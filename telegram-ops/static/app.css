@@ -1,0 +1,21 @@
+body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f6f7fb; color: #1f2937; }
+header { background: #111827; color: #fff; padding: 14px 24px; }
+nav a { color: #d1d5db; margin-right: 14px; text-decoration: none; }
+nav a:hover { color: #fff; }
+main { padding: 24px; }
+.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+label { display: block; margin: 8px 0; font-size: 14px; }
+input, textarea, select { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; }
+textarea { min-height: 90px; }
+button { background: #2563eb; color: #fff; border: 0; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+button.secondary { background: #4b5563; }
+button.danger { background: #dc2626; }
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
+th { background: #f9fafb; }
+.muted { color: #6b7280; font-size: 13px; }
+.status { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #e5e7eb; font-size: 12px; }
+.status.active, .status.sent { background: #dcfce7; color: #166534; }
+.status.flood_wait, .status.failed, .status.banned { background: #fee2e2; color: #991b1b; }
+.inline { display: inline; }

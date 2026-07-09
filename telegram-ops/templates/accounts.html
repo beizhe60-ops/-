@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>新增账户</h2>
+  <form method="post" action="/accounts">
+    <div class="grid">
+      <label>名称（可选，默认手机号）<input name="name"></label>
+      <label>手机号<input name="phone" required></label>
+      <label>API ID<input name="api_id" type="number" required></label>
+      <label>API Hash<input name="api_hash" required></label>
+    </div>
+    <div class="grid">
+      <label><input type="checkbox" name="send_enabled" value="true" checked> 允许发送</label>
+      <label><input type="checkbox" name="private_message_enabled" value="true"> 允许自动私信</label>
+      <label><input type="checkbox" name="proxy_enabled" value="true"> 启用固定代理</label>
+      <label>代理类型<select name="proxy_type"><option>socks5</option><option>socks4</option><option>http</option></select></label>
+      <label>代理 Host<input name="proxy_host"></label>
+      <label>代理 Port<input name="proxy_port" type="number"></label>
+      <label>代理用户<input name="proxy_username"></label>
+      <label>代理密码<input name="proxy_password" type="password"></label>
+    </div>
+    <button>保存账户</button>
+  </form>
+</div>
+<div class="card">
+  <h2>账户列表</h2>
+  <table>
+    <tr><th>ID</th><th>名称</th><th>手机号</th><th>状态</th><th>代理</th><th>发送/私信</th><th>最近检查</th><th>操作</th></tr>
+    {% for a in accounts %}
+    <tr>
+      <td>{{ a.id }}</td><td>{{ a.name }}</td><td>{{ a.phone }}</td>
+      <td>
+        <span class="status {{ a.status }}">{{ a.status }}</span>
+        {% if a.risk_status %}
+          <br><span class="status risk">{{ a.risk_status }}</span>
+        {% endif %}
+        <br><span class="muted">{{ a.last_error or "" }}</span>
+      </td>
+      <td>{{ "on" if a.proxy_enabled else "off" }} {{ a.proxy_host or "" }}</td>
+      <td>{{ "send" if a.send_enabled else "no-send" }} / {{ "private" if a.private_message_enabled else "no-private" }}</td>
+      <td>{{ a.last_health_check_at or "" }}</td>
+      <td>
+        <form class="inline" method="post" action="/accounts/{{ a.id }}/send-code"><button>发送验证码</button></form>
+        <form class="inline" method="post" action="/accounts/{{ a.id }}/sync-chats"><button class="secondary">同步群组</button></form>
+        <!-- <form class="inline" method="post" action="/accounts/{{ a.id }}/health-check"><button class="secondary">测活</button></form> -->
+        <form class="inline" method="post" action="/accounts/{{ a.id }}/toggle"><button class="danger">禁用/恢复</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "Telegram Ops Workbench" }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <strong>Telegram Ops Workbench</strong>
+  <nav>
+    <a href="/">仪表盘</a>
+    <a href="/accounts">账户</a>
+    <a href="/chats">群组</a>
+    <a href="/rules">规则</a>
+    <a href="/leads">线索</a>
+    <a href="/queue">发送队列</a>
+    <a href="/guards">黑名单/退订</a>
+    <a href="/logs">日志</a>
+    <a href="/admin/logout">退出</a>
+  </nav>
+</header>
+<main>
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

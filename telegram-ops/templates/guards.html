@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>黑名单 / 退订</h2>
+  <form method="post" action="/guards">
+    <div class="grid">
+      <label>Telegram User ID<input name="telegram_user_id" type="number" required></label>
+      <label>Username<input name="username"></label>
+      <label><input type="checkbox" name="blacklisted" value="true"> 黑名单</label>
+      <label><input type="checkbox" name="unsubscribed" value="true"> 退订</label>
+    </div>
+    <label>备注<textarea name="note"></textarea></label>
+    <button>保存</button>
+  </form>
+</div>
+<div class="card">
+  <table>
+    <tr><th>User ID</th><th>Username</th><th>黑名单</th><th>退订</th><th>备注</th></tr>
+    {% for g in guards %}
+    <tr><td>{{ g.telegram_user_id }}</td><td>{{ g.username or "" }}</td><td>{{ g.blacklisted }}</td><td>{{ g.unsubscribed }}</td><td>{{ g.note or "" }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
