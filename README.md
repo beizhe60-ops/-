@@ -38,13 +38,14 @@
 python3 ./telegram-ops/scripts/hash_password.py 
 ```
 按提示输入admin密码，将生成的密码hash填入.env文件的ADMIN_PASSWORD_HASH字段并将ADMIN_PASSWORD置空
+
 4. ```docker-compose up -d```启动docker
 # 操作说明
 1. 登录telegram账户，加入要监听的群组（有的群组需要人工验证），可参考下方的群组。
-2. 添加telegram账号,填入账号和app id及api hash,按需选择允许发送、允许自动私信和代理。(./IMAGES/telegram1.jpg)
-3. 登录账户，账户状态为login_require时发送验证码，填写收到的验证码和密码（如果有的话），验证通过后状态栏显示为active，再进行同步群组。(./IMAGES/telegram2.jpg)
-4. 在群组页面查看同步的群组,要开启监听，确保监听一栏为True，可通过启用/禁用切换状态。(./IMAGES/telegram3.jpg)
-5. 在规则页面新增监听规则，模式可选keyword/regex，发送模式可选record_only/group_reply/private_message/both,新注册的号建议每天上限不超过5-10，老号建议不超过20-50，冷却时间为两次私信之间的时间间隔，默认为1天，自行修改，建议不少于3600（1小时）,不然容易被封号。(./IMAGES/telegram4.jpg)
+2. 添加telegram账号,填入账号和app id及api hash,按需选择允许发送、允许自动私信和代理。![](./IMAGES/telegram1.jpg)
+3. 登录账户，账户状态为login_require时发送验证码，填写收到的验证码和密码（如果有的话），验证通过后状态栏显示为active，再进行同步群组。![](./IMAGES/telegram2.jpg)
+4. 在群组页面查看同步的群组,要开启监听，确保监听一栏为True，可通过启用/禁用切换状态。![](./IMAGES/telegram3.jpg)
+5. 在规则页面新增监听规则，模式可选keyword/regex，发送模式可选record_only/group_reply/private_message/both,新注册的号建议每天上限不超过5-10，老号建议不超过20-50，冷却时间为两次私信之间的时间间隔，默认为1天，自行修改，建议不少于3600（1小时）,不然容易被封号。![](./IMAGES/telegram4.jpg)
 
 
 # 安全措施
