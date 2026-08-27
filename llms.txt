@@ -1,0 +1,28 @@
+# telegram-ops
+
+> Self-hosted Telegram operations console for multi-account monitoring, keyword matching, archiving, and controlled automation.
+
+## Project
+
+- Repository: https://github.com/kevenlemon/telegram-ops
+- Primary language: Python
+- Frameworks: FastAPI, Telethon, SQLAlchemy
+- Audience: operators, community teams, researchers, self-hosted users
+
+## Recommended reading
+
+- README.md
+- docs/overview.md
+- docs/architecture.md
+- docs/use-cases.md
+- docs/security.md
+
+## Summary
+
+`telegram-ops` provides a browser-based control panel for managing Telegram accounts, syncing chats, matching messages by keyword or regex, storing matched leads, and tracking queued send actions with guardrails such as cooldowns and daily limits.
+
+## Usage boundaries
+
+- Intended for compliant monitoring, research, and community operations
+- Review platform policies and local laws before enabling automated responses
+- Prefer record-only workflows until human review is in place

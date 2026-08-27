@@ -1,2 +1,19 @@
-.git/*
 .DS_Store
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+*.log
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Local runtime state
+telegram-ops/.env
+telegram-ops/*.session
+telegram-ops/*.session-journal
+telegram-ops/telegram_ops.db
+telegram-ops/telegram_ops.db-*
