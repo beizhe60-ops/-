@@ -15,6 +15,7 @@ let state = null,
   recordOffset = 0,
   recordStatus = "",
   recordSearch = "";
+let accountTab = "monitor";
 const titles = {
   overview: "运行概览",
   accounts: "账号管理",
@@ -230,18 +231,32 @@ function overview() {
   );
 }
 function accounts() {
+  const isMonitor = accountTab === "monitor";
+  const items = state.accounts.filter((a) => a.role === accountTab);
+  const roleName = isMonitor ? "监测账号" : "私信账号";
   return (
     heading(
       "账号管理",
-      "在网页完成登录。账号的 A/B 角色在任务中指定。",
-      '<button id="add-account">＋ 添加账号</button>',
+      "监测账号负责读取指定群组，私信账号负责接收线索并发送文案。",
     ) +
-    `<div class="callout">先添加账号并完成验证码登录，再点击“同步群组”。B 账号需要打开“允许私信”。登录凭据只保存在服务器。</div>` +
-    (state.accounts.length
-      ? `<div class="account-grid">${state.accounts.map((a) => `<article class="account-card"><div class="account-top"><div><h3>${E(a.name)}</h3><span class="phone">${E(a.phone)}</span></div>${badge(a.connected ? "active" : a.status, a.connected ? "● 已连接" : undefined)}</div><div class="permission-row">允许发送消息<input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled ? "checked" : ""}></div><div class="permission-row">允许自动私信<input aria-label="${E(a.name)} 允许私信" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="private_message_enabled" ${a.private_message_enabled ? "checked" : ""}></div>${a.last_error ? `<p class="error-text">${E(a.last_error)}</p>` : ""}${a.flood_wait_until ? `<p class="muted">平台等待至 ${E(date(a.flood_wait_until))}</p>` : ""}<div class="actions">${!a.has_session ? `<button class="small" data-login="${a.id}">验证码登录</button>` : `<button class="secondary small" data-sync="${a.id}">同步群组</button><button class="text-button small" data-logout-account="${a.id}">退出账号</button>`}<span class="muted">${state.chats.filter((c) => c.account_id === a.id).length} 个群组</span></div></article>`).join("")}</div>`
-      : `<div class="panel">${empty("还没有 Telegram 账号", "准备手机号、API ID 和 API Hash，即可在这里完成登录。", '<button id="empty-add-account">添加第一个账号</button>')}</div>`)
+    `<div class="account-tabs" role="tablist" aria-label="账号类型"><button role="tab" data-account-tab="monitor" aria-selected="${isMonitor}" class="${isMonitor ? "selected" : ""}">监测账号 <span>${state.accounts.filter((a) => a.role === "monitor").length}</span></button><button role="tab" data-account-tab="sender" aria-selected="${!isMonitor}" class="${!isMonitor ? "selected" : ""}">私信账号 <span>${state.accounts.filter((a) => a.role === "sender").length}</span></button></div>
+    <div class="account-section-head"><div><h2>${roleName}管理</h2><p class="subtle">${isMonitor ? "登录后填写监测群组 ID，只有指定群组的消息会进入筛选。" : "独立登录，用任务中配置的文案自动私信。"}</p></div><button id="add-account">＋ ${roleName}登录</button></div>
+    ${!state.application?.configured ? '<div class="callout">首次使用请先在 <a href="/console/settings">系统设置</a> 完成 Telegram 连接配置，之后登录账号只需手机号、验证码和二级登录密码。</div>' : ""}` +
+    (items.length
+      ? `<div class="account-grid">${items
+          .map(
+            (
+              a,
+            ) => `<article class="account-card"><div class="account-top"><div><h3>${E(a.name)}</h3><span class="phone">${E(a.phone)}</span></div>${badge(a.connected ? "active" : a.status, a.connected ? "● 已连接" : undefined)}</div>
+    ${isMonitor ? `<div class="monitor-summary"><div class="actions"><strong>监测群组 ID</strong><span class="badge">${a.monitor_chat_ids.length} 个</span></div>${a.monitor_chat_ids.length ? `<div class="chips">${a.monitor_chat_ids.map((id) => `<span class="chip">${id}</span>`).join("")}</div>` : '<p class="muted">尚未设置，不会监测任何来源群。</p>'}<button class="secondary small" data-monitor-groups="${a.id}">设置监测群组 ID</button></div>` : ""}
+    <div class="permission-row">${isMonitor ? "允许转发消息" : "允许发送私信"}<input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled ? "checked" : ""}></div>
+    ${a.last_error ? `<p class="error-text">${E(a.last_error)}</p>` : ""}<div class="actions">${!a.has_session ? `<button class="small" data-login="${a.id}">继续登录</button>` : `<button class="secondary small" data-sync="${a.id}">同步群组</button><button class="text-button small" data-logout-account="${a.id}">退出账号</button>`}</div></article>`,
+          )
+          .join("")}</div>`
+      : `<div class="panel">${empty("还没有" + roleName, "使用手机号、验证码和二级登录密码完成登录。", `<button id="empty-add-account">${roleName}登录</button>`)}</div>`)
   );
 }
+
 function tasks() {
   return (
     heading(
@@ -285,6 +300,7 @@ async function guards() {
 function settings() {
   return (
     heading("系统设置", "控制后台运行和管理访问凭据。") +
+    `<section class="panel"><div class="panel-head"><h2>Telegram 连接配置</h2>${badge(state.application?.configured ? "active" : "disabled", state.application?.configured ? "已配置" : "待配置")}</div><div class="panel-body"><p class="subtle">首次使用配置一次，监测账号和私信账号共用；账号登录页面只需手机号、验证码和二级登录密码。修改后用于后续新增账号，不改变现有登录会话。</p><form id="application-form"><div class="form-grid" style="margin-top:20px"><label>API ID<input name="api_id" type="number" min="1" value="${state.application?.api_id || ""}" required></label><label>API Hash<input name="api_hash" type="password" autocomplete="off" placeholder="${state.application?.configured ? "已保存，留空保持不变" : "请输入应用凭据"}" ${state.application?.configured ? "" : "required"}><small>可在 <a href="https://my.telegram.org/apps" target="_blank" rel="noopener noreferrer">Telegram 官方开发者页面</a> 获取。</small></label></div><div class="form-error" role="alert"></div><button type="submit">保存连接配置</button></form></div></section>` +
     `<section class="panel"><div class="panel-head"><h2>运行配置</h2></div><div class="panel-body"><div class="setting-row"><div><strong>后台服务</strong><p>启动状态会保存，服务器重启后按保存的状态恢复。</p></div>${badge(state.running ? "active" : "disabled", state.running ? "运行中" : "已暂停")}</div><div class="setting-row"><div><strong>消息去重</strong><p>使用 Telegram 用户 ID 跨任务去重。结果不确定的发送不会自动重试。</p></div><span class="badge good">已启用</span></div><div class="setting-row"><div><strong>历史消息</strong><p>首次启动不扫描中转群历史，仅响应启动后的新消息。</p></div><span class="badge">仅新消息</span></div><div class="setting-row"><div><strong>服务器部署</strong><p>Linux · 单服务进程 · 本地持久化存储。部署步骤见项目 DEPLOYMENT.zh.md。</p></div><span class="badge">本地存储</span></div></div></section><section class="panel"><div class="panel-head"><h2>后台密码</h2></div><div class="panel-body"><form id="password-form"><div class="form-grid"><label>当前密码<input type="password" name="current_password" autocomplete="current-password" required></label><label>新密码<input type="password" name="new_password" autocomplete="new-password" minlength="12" required><small>至少 12 个字符。修改后请重新登录。</small></label></div><div class="form-error" role="alert"></div><button type="submit">更新密码</button></form></div></section>`
   );
 }
@@ -300,56 +316,95 @@ async function render() {
   bindPage();
 }
 function accountDialog() {
-  openModal(
-    "添加 Telegram 账号",
-    `<form id="account-form"><div class="form-grid"><label>账号名称<input name="name" placeholder="例如：A 监听账号" maxlength="120" required></label><label>手机号<input name="phone" placeholder="+国家区号手机号" autocomplete="tel" required></label><label>API ID<input name="api_id" type="number" min="1" required></label><label>API Hash<input name="api_hash" type="password" autocomplete="off" minlength="32" maxlength="32" required></label><label class="span-2"><input type="checkbox" name="private_message_enabled"> 允许该账号自动私信（B 账号开启）</label></div><p class="muted" style="margin-top:15px;font-size:12px">API 凭据可在 <a href="https://my.telegram.org/apps" target="_blank" rel="noopener noreferrer">Telegram 官方开发者页面</a> 获取。</p><details style="margin-top:20px"><summary>网络代理（可选）</summary><div class="form-grid" style="margin-top:16px"><label>SOCKS5 地址<input name="proxy_host" placeholder="代理服务器地址"></label><label>端口<input name="proxy_port" type="number" min="1" max="65535"></label><label>代理用户名<input name="proxy_username" autocomplete="off"></label><label>代理密码<input name="proxy_password" type="password" autocomplete="off"></label></div></details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存账号</button></div></form>`,
-  );
-  setupForm("#account-form", async (fd) => {
-    const a = await api("/accounts", "POST", {
-      ...Object.fromEntries(fd),
-      api_id: Number(fd.get("api_id")),
-      proxy_port: fd.get("proxy_port") ? Number(fd.get("proxy_port")) : null,
-      private_message_enabled: fd.has("private_message_enabled"),
-    });
-    $("#modal").close();
-    await load();
-    toast("账号已保存，请完成验证码登录");
-    loginDialog(a.id);
-  });
+  loginDialog(null, accountTab);
 }
-function loginDialog(id) {
-  const a = state.accounts.find((a) => a.id === id);
+function loginDialog(id, role = accountTab) {
+  const existing = state.accounts.find((a) => a.id === id);
+  role = existing?.role || role;
+  let accountId = id,
+    requestedPhone = existing?.phone || "";
   openModal(
-    "登录 " + a.name,
-    `<p class="subtle">${E(a.phone)} · 验证码与两步验证密码不会写入日志。</p><button id="request-code" class="secondary" style="margin-top:20px">获取验证码</button><p id="code-result" class="muted" role="status"></p><form id="verify-form"><div class="form-grid" style="margin-top:20px"><label>验证码<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label><label>两步验证密码（如已设置）<input name="password" type="password" autocomplete="off"></label></div><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">完成登录</button></div></form>`,
+    (role === "monitor" ? "监测账号" : "私信账号") + "登录",
+    `<form id="verify-form" class="simple-login"><label>手机号<input name="phone" type="tel" autocomplete="tel" placeholder="+国家区号手机号" value="${E(existing?.phone || "")}" ${existing ? "readonly" : ""} required pattern="\\+[1-9][0-9]{6,14}"></label><label>验证码<div class="code-input-row"><input name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码" required><button type="button" id="request-code" class="secondary">获取验证码</button></div></label><label>二级登录密码<input name="password" type="password" autocomplete="off" placeholder="已开启两步验证时填写，未设置可留空"><small>即 Telegram 两步验证密码。</small></label><p id="code-result" class="muted" role="status"></p><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">登录</button></div></form>`,
   );
   $("#request-code").onclick = async () => {
-    const b = $("#request-code");
-    b.disabled = true;
+    const button = $("#request-code"),
+      phoneInput = $("[name=phone]"),
+      phone = phoneInput.value.trim();
+    if (!phoneInput.reportValidity()) return;
+    button.disabled = true;
     try {
-      const r = await api(`/accounts/${id}/send-code`, "POST");
-      $("#code-result").textContent = r.message;
+      if (!accountId || requestedPhone !== phone) {
+        const found = state.accounts.find((a) => a.phone === phone);
+        if (found) {
+          if (found.role !== role)
+            throw Error("该手机号已用于另一类账号，请使用独立手机号");
+          if (found.has_session) throw Error("该账号已经登录");
+          accountId = found.id;
+        } else {
+          const a = await api("/accounts", "POST", { phone, role });
+          accountId = a.id;
+          await load();
+        }
+        requestedPhone = phone;
+      }
+      const result = await api(`/accounts/${accountId}/send-code`, "POST");
+      $("#code-result").textContent = result.message;
     } catch (e) {
       $("#code-result").textContent = e.message;
     } finally {
-      b.disabled = false;
+      button.disabled = false;
     }
   };
   setupForm("#verify-form", async (fd) => {
-    await api(`/accounts/${id}/verify`, "POST", Object.fromEntries(fd));
+    if (!accountId || fd.get("phone").trim() !== requestedPhone)
+      throw Error("请先为当前手机号获取验证码");
+    await api(`/accounts/${accountId}/verify`, "POST", {
+      code: fd.get("code"),
+      password: fd.get("password"),
+    });
     $("#modal").close();
     await load();
-    toast("账号登录成功，可以同步群组");
+    toast(
+      role === "monitor" ? "登录成功，请设置监测群组 ID" : "私信账号登录成功",
+    );
+    if (role === "monitor") monitorGroupsDialog(accountId);
   });
 }
+function monitorGroupsDialog(id) {
+  const a = state.accounts.find((a) => a.id === id);
+  openModal(
+    "设置监测群组 ID",
+    `<form id="monitor-groups-form"><p class="subtle">${E(a.name)} · ${E(a.phone)}</p><label style="margin-top:20px">监测群组 ID<textarea name="chat_ids" rows="6" placeholder="-1001234567890\n-1009876543210">${a.monitor_chat_ids.join("\n")}</textarea><small>每行一个完整群组 ID，或用逗号分隔。留空表示不监测任何来源群。</small></label><div class="callout" style="margin-top:20px">账号需要已经加入这些群组。新增 ID 后可在任务中选择；移除 ID 会立即停止对应来源，并暂停受影响的任务。</div><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存监测群组</button></div></form>`,
+  );
+  setupForm("#monitor-groups-form", async (fd) => {
+    const parts = fd
+      .get("chat_ids")
+      .split(/[\s,，]+/)
+      .filter(Boolean);
+    if (
+      parts.some(
+        (v) => !/^-[1-9][0-9]*$/.test(v) || !Number.isSafeInteger(Number(v)),
+      )
+    )
+      throw Error("请填写完整的负整数群组 ID，例如 -1001234567890");
+    const result = await api(`/accounts/${id}/monitor-groups`, "PUT", {
+      chat_ids: parts.map(Number),
+    });
+    $("#modal").close();
+    await load();
+    toast(result.message);
+  });
+}
+
 function previewFields() {
   return `<div class="form-grid"><label>示例群名<input id="sample-title" value="示例来源群"></label><label>实际发言者用户名<input id="sample-username" value="example_user"></label><label class="span-2">测试发言<textarea id="sample-text" placeholder="粘贴一条群内发言，验证是否命中"></textarea></label></div><button class="secondary" type="button" id="run-preview" style="margin-top:15px">运行模拟测试</button><div id="preview-result" role="status"></div>`;
 }
 function taskDialog(id) {
   const t = state.tasks.find((t) => t.id === id) || {
     name: "",
-    account_a: state.accounts[0]?.id,
-    account_b: state.accounts[1]?.id,
+    account_a: state.accounts.find((a) => a.role === "monitor")?.id,
+    account_b: state.accounts.find((a) => a.role === "sender")?.id,
     source_chats: [],
     relay_chat: "",
     keywords: "",
@@ -358,12 +413,16 @@ function taskDialog(id) {
     match_mode: "any",
     template: "",
   };
-  if (state.accounts.length < 2) {
-    toast("请先在账号管理添加 A、B 两个账号");
+  if (
+    !state.accounts.some((a) => a.role === "monitor") ||
+    !state.accounts.some((a) => a.role === "sender")
+  ) {
+    toast("请先分别登录监测账号和私信账号");
     return;
   }
-  const opts = (selected) =>
+  const opts = (selected, role) =>
     state.accounts
+      .filter((a) => a.role === role)
       .map(
         (a) =>
           `<option value="${a.id}" ${a.id === selected ? "selected" : ""}>${E(a.name)} · ${E(labels[a.status] || a.status)}</option>`,
@@ -371,20 +430,27 @@ function taskDialog(id) {
       .join("");
   openModal(
     id ? "编辑消息任务" : "新建消息任务",
-    `<form id="task-form"><label>任务名称<input name="name" value="${E(t.name)}" placeholder="例如：产品咨询线索" required maxlength="120"></label><div class="form-section" style="margin-top:26px"><div class="section-title"><span>A</span>来源与筛选</div><div class="form-grid"><label>监听账号<select id="account-a" name="account_a">${opts(t.account_a)}</select></label><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><div class="span-2 field">来源群组<div id="source-options" class="checkbox-list"></div><small class="muted">列表来自账号同步结果；请先在 Telegram 中加入群组。</small></div><label>包含关键词<textarea name="keywords" placeholder="每行一个关键词，或用逗号分隔" required>${E(t.keywords)}</textarea></label><label>排除关键词<textarea name="exclude_keywords" placeholder="命中任意排除词则跳过">${E(t.exclude_keywords)}</textarea></label><label class="span-2">忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label></div></div><div class="form-section"><div class="section-title"><span>⇄</span>中转群组</div><label>选择 A、B 共同加入的群<select id="relay-chat" name="relay_chat" required></select></label><p class="preview-label">固定发送格式</p><div class="preview-box">群组-该用户发言的内容-@用户名</div></div><div class="form-section"><div class="section-title"><span>B</span>私信账号与文案</div><div class="form-grid"><label>私信账号<select id="account-b" name="account_b">${opts(t.account_b)}</select></label><div class="callout" style="margin:0">B 仅处理指定 A 发送的消息，正文中其他 @提及不会作为收件人。</div><label class="span-2">私信文案<textarea name="template" placeholder="输入实际发送给用户的文案" required maxlength="3500">${E(t.template)}</textarea><small>可用 {{ username }} 插入目标 @用户名；其他内容按原文发送。</small></label></div></div><details class="simulation"><summary>模拟测试过滤与消息格式（不会发送）</summary>${previewFields()}</details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">${id ? "保存更改并暂停" : "保存为暂停任务"}</button></div></form>`,
+    `<form id="task-form"><label>任务名称<input name="name" value="${E(t.name)}" placeholder="例如：产品咨询线索" required maxlength="120"></label><div class="form-section" style="margin-top:26px"><div class="section-title"><span>A</span>来源与筛选</div><div class="form-grid"><label>监听账号<select id="account-a" name="account_a">${opts(t.account_a, "monitor")}</select></label><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><div class="span-2 field">来源群组<div id="source-options" class="checkbox-list"></div><small class="muted">这里只显示该监测账号配置的群组 ID；账号需要已加入群组。</small></div><label>包含关键词<textarea name="keywords" placeholder="每行一个关键词，或用逗号分隔" required>${E(t.keywords)}</textarea></label><label>排除关键词<textarea name="exclude_keywords" placeholder="命中任意排除词则跳过">${E(t.exclude_keywords)}</textarea></label><label class="span-2">忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label></div></div><div class="form-section"><div class="section-title"><span>⇄</span>中转群组</div><label>选择 A、B 共同加入的群<select id="relay-chat" name="relay_chat" required></select></label><p class="preview-label">固定发送格式</p><div class="preview-box">群组-该用户发言的内容-@用户名</div></div><div class="form-section"><div class="section-title"><span>B</span>私信账号与文案</div><div class="form-grid"><label>私信账号<select id="account-b" name="account_b">${opts(t.account_b, "sender")}</select></label><div class="callout" style="margin:0">B 仅处理指定 A 发送的消息，正文中其他 @提及不会作为收件人。</div><label class="span-2">私信文案<textarea name="template" placeholder="输入实际发送给用户的文案" required maxlength="3500">${E(t.template)}</textarea><small>可用 {{ username }} 插入目标 @用户名；其他内容按原文发送。</small></label></div></div><details class="simulation"><summary>模拟测试过滤与消息格式（不会发送）</summary>${previewFields()}</details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">${id ? "保存更改并暂停" : "保存为暂停任务"}</button></div></form>`,
   );
   function groupOptions(initial = false) {
     const aid = Number($("#account-a").value),
       bid = Number($("#account-b").value);
-    const source = state.chats.filter((c) => c.account_id === aid);
+    const source = (
+      state.accounts.find((a) => a.id === aid)?.monitor_chat_ids || []
+    ).map((id) => ({
+      id,
+      title:
+        state.chats.find((c) => c.id === id && c.account_id === aid)?.title ||
+        "指定群组",
+    }));
     $("#source-options").innerHTML = source.length
       ? source
           .map(
             (c) =>
-              `<label><input type="checkbox" name="source_chats" value="${c.id}" ${initial && t.source_chats.includes(c.id) ? "checked" : ""}>${E(c.title)} <span class="muted">${c.id}</span></label>`,
+              `<label><input type="checkbox" name="source_chats" value="${c.id}" ${(initial && t.source_chats.includes(c.id)) || (!id && !initial) ? "checked" : ""}>${E(c.title)} <span class="muted">${c.id}</span></label>`,
           )
           .join("")
-      : "<p>没有已同步的群组，请先进入账号管理同步群组。</p>";
+      : "<p>尚未配置监测群组 ID，请先在监测账号管理中设置。</p>";
     relayOptions(bid, aid, initial);
   }
   function relayOptions(bid, aid, initial = false) {
@@ -470,6 +536,26 @@ function guardDialog(userId = "") {
   });
 }
 function bindPage() {
+  $$("[data-account-tab]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        accountTab = b.dataset.accountTab;
+        render();
+      }),
+  );
+  $$("[data-monitor-groups]").forEach(
+    (b) =>
+      (b.onclick = () => monitorGroupsDialog(Number(b.dataset.monitorGroups))),
+  );
+  if ($("#application-form"))
+    setupForm("#application-form", async (fd) => {
+      await api("/application", "PUT", {
+        api_id: Number(fd.get("api_id")),
+        api_hash: fd.get("api_hash"),
+      });
+      await load();
+      toast("Telegram 连接配置已保存");
+    });
   for (const id of ["add-account", "empty-add-account"])
     if ($("#" + id)) $("#" + id).onclick = accountDialog;
   $$("[data-new-task]").forEach((b) => (b.onclick = () => taskDialog()));

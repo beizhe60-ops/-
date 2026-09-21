@@ -18,6 +18,7 @@ from app.crypto import decrypt_text
 from app.database import session_scope
 from app.models import Account, UserGuard
 from app.relay_models import RelayTask, RelayJob, ContactReceipt
+from app.relay_models import AccountProfile
 from app.relay_logic import filter_message, format_relay, parse_relay, render_copy
 from app.telegram_client import make_client
 
@@ -158,9 +159,16 @@ class RelayEngine:
             return
         with session_scope() as db:
             tasks = db.query(RelayTask).filter(RelayTask.enabled.is_(True)).all()
+            profile = db.get(AccountProfile, account_id)
+            monitor_ids = (
+                set(json.loads(profile.monitor_chat_ids))
+                if profile and profile.role == "monitor"
+                else set()
+            )
         for task in tasks:
             if (
                 account_id == task.account_a
+                and int(event.chat_id) in monitor_ids
                 and int(event.chat_id) in json.loads(task.source_chats)
                 and not event.out
             ):
@@ -192,7 +200,12 @@ class RelayEngine:
                     text,
                     formatted,
                 )
-            if account_id == task.account_b and int(event.chat_id) == task.relay_chat:
+            if (
+                profile
+                and profile.role == "sender"
+                and account_id == task.account_b
+                and int(event.chat_id) == task.relay_chat
+            ):
                 trusted_id = self.identities.get(task.account_a)
                 if not trusted_id or event.sender_id != trusted_id:
                     continue

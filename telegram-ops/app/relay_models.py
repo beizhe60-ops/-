@@ -68,3 +68,10 @@ class ConsoleState(Base):
     __tablename__ = "console_state"
     key: Mapped[str] = mapped_column(String(80), primary_key=True)
     value: Mapped[str] = mapped_column(Text)
+
+
+class AccountProfile(Base, TimestampMixin):
+    __tablename__ = "account_profiles"
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
+    role: Mapped[str] = mapped_column(String(16), default="monitor")
+    monitor_chat_ids: Mapped[str] = mapped_column(Text, default="[]")

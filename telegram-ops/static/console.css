@@ -988,3 +988,100 @@ details summary {
     display: flex;
   }
 }
+.account-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 26px;
+}
+.account-tabs button {
+  background: transparent;
+  color: var(--muted);
+  border-radius: 0;
+  padding: 14px 20px;
+  border-bottom: 3px solid transparent;
+}
+.account-tabs button.selected {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+  background: #e3f4f355;
+}
+.account-tabs span {
+  margin-left: 7px;
+  background: var(--nav);
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.account-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 22px;
+}
+.account-section-head p {
+  font-size: 12px;
+  margin-top: 8px;
+}
+.monitor-summary {
+  background: var(--bg);
+  padding: 16px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.monitor-summary .actions {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  justify-content: space-between;
+}
+.monitor-summary p {
+  margin: 12px 0;
+}
+.monitor-summary button {
+  margin-top: 14px;
+}
+.simple-login {
+  max-width: 580px;
+  margin: 0 auto;
+}
+.simple-login > label {
+  margin-bottom: 22px;
+}
+.simple-login #code-result {
+  font-size: 12px;
+}
+.code-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 8px;
+}
+.code-input-row input:not([type="checkbox"]) {
+  margin: 0;
+  flex: 1;
+}
+.code-input-row button {
+  white-space: nowrap;
+}
+dialog:has(.simple-login) {
+  max-width: 620px;
+}
+@media (max-width: 760px) {
+  .account-section-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .account-tabs button {
+    flex: 1;
+    padding: 13px 10px;
+  }
+  .code-input-row {
+    gap: 6px;
+  }
+  .code-input-row button {
+    padding: 10px;
+    font-size: 12px;
+  }
+}

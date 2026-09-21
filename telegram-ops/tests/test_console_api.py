@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.database import session_scope
 from app.models import Account, Chat
-from app.relay_models import RelayJob
+from app.relay_models import RelayJob, AccountProfile
 
 HEAD = {"X-Console-Request": "1"}
 
@@ -35,6 +35,13 @@ def seed():
                 )
             )
             db.flush()
+            db.add(
+                AccountProfile(
+                    account_id=i,
+                    role="monitor" if i == 1 else "sender",
+                    monitor_chat_ids="[-1001]" if i == 1 else "[]",
+                )
+            )
             db.add(
                 Chat(
                     account_id=i,
@@ -78,13 +85,25 @@ def test_pages():
 def test_account_validation_secrets():
     with TestClient(app) as c:
         login(c)
-        d = dict(name="监听A", phone="+12345678901", api_id=1234, api_hash="a" * 32)
+        d = dict(phone="+12345678901", role="monitor")
+        assert c.post("/api/accounts", json=d, headers=HEAD).status_code == 400
+        assert (
+            c.put(
+                "/api/application",
+                json={"api_id": 1234, "api_hash": "a" * 32},
+                headers=HEAD,
+            ).status_code
+            == 200
+        )
         r = c.post("/api/accounts", json=d, headers=HEAD)
         assert r.status_code == 200
+        assert r.json()["role"] == "monitor" and r.json()["monitor_chat_ids"] == []
         assert "api_hash" not in r.text and "a" * 32 not in c.get("/api/state").text
         assert c.post("/api/accounts", json=d, headers=HEAD).status_code == 409
-        r = c.post(
-            "/api/accounts", json={**d, "api_hash": "SECRET_BAD_HASH"}, headers=HEAD
+        r = c.put(
+            "/api/application",
+            json={"api_id": 1234, "api_hash": "SECRET_BAD_HASH"},
+            headers=HEAD,
         )
         assert r.status_code == 422 and "SECRET_BAD_HASH" not in r.text
 
@@ -203,3 +222,153 @@ def test_redirect_is_local():
             follow_redirects=False,
         )
         assert r.headers["location"] == "/console"
+
+
+def test_shared_application_credentials_and_role_defaults():
+    from app.crypto import decrypt_text
+    from app.relay_models import ConsoleState
+
+    with TestClient(app) as c:
+        login(c)
+        config = {"api_id": 12345, "api_hash": "b" * 32}
+        assert c.put("/api/application", headers=HEAD, json=config).status_code == 200
+        for phone, role in [("+12345678901", "monitor"), ("+12345678902", "sender")]:
+            r = c.post(
+                "/api/accounts", headers=HEAD, json={"phone": phone, "role": role}
+            )
+            assert r.status_code == 200 and r.json()["role"] == role
+            assert r.json()["private_message_enabled"] == (role == "sender")
+        with session_scope() as db:
+            assert "b" * 32 not in db.get(ConsoleState, "telegram_application").value
+            for a in db.query(Account):
+                assert (
+                    a.api_id == 12345 and decrypt_text(a.api_hash_encrypted) == "b" * 32
+                )
+        assert (
+            c.put(
+                "/api/application", headers=HEAD, json={"api_id": 12345, "api_hash": ""}
+            ).status_code
+            == 200
+        )
+        assert (
+            c.put(
+                "/api/application", headers=HEAD, json={"api_id": 6789, "api_hash": ""}
+            ).status_code
+            == 422
+        )
+        assert (
+            c.post(
+                "/api/accounts",
+                headers=HEAD,
+                json={"phone": "+12345678903", "role": "other"},
+            ).status_code
+            == 422
+        )
+
+
+def test_monitor_groups_exact_ids_validation_and_task_pause():
+    from app.relay_models import RelayTask
+
+    with TestClient(app) as c:
+        login(c)
+        seed()
+        for invalid in [[100], ["-1001"], [True], [-1.5]]:
+            assert (
+                c.put(
+                    "/api/accounts/1/monitor-groups",
+                    headers=HEAD,
+                    json={"chat_ids": invalid},
+                ).status_code
+                == 422
+            )
+        assert (
+            c.put(
+                "/api/accounts/2/monitor-groups",
+                headers=HEAD,
+                json={"chat_ids": [-1001]},
+            ).status_code
+            == 422
+        )
+        assert c.put(
+            "/api/accounts/1/monitor-groups",
+            headers=HEAD,
+            json={"chat_ids": [-1001, -1003, -1001]},
+        ).json()["chat_ids"] == [-1003, -1001]
+        data = dict(
+            name="指定群任务",
+            account_a=1,
+            account_b=2,
+            source_chats=[-1003],
+            relay_chat=-1002,
+            keywords="咨询",
+            template="你好",
+        )
+        # Explicit IDs do not require source dialogs to have been synced.
+        task = c.post("/api/tasks", headers=HEAD, json=data).json()
+        id = task["id"]
+        assert c.post(f"/api/tasks/{id}/toggle", headers=HEAD).json()["enabled"]
+        with session_scope() as db:
+            db.add(
+                RelayJob(
+                    task_id=id,
+                    stage="relay",
+                    account_id=1,
+                    chat_id=-1003,
+                    message_id=1,
+                    username="target_user",
+                    original_text="咨询",
+                    text="群-咨询-@target_user",
+                )
+            )
+        r = c.put(
+            "/api/accounts/1/monitor-groups", headers=HEAD, json={"chat_ids": [-1001]}
+        )
+        assert r.json()["paused_tasks"] == 1
+        with session_scope() as db:
+            assert not db.get(RelayTask, id).enabled
+            assert db.get(RelayTask, id).source_chats == "[]"
+            assert db.query(RelayJob).one().status == "cancelled"
+
+
+def test_legacy_profiles_migration_is_idempotent():
+    from app.account_settings import migrate_profiles
+    from app.relay_models import RelayTask
+
+    with session_scope() as db:
+        db.add(
+            Account(
+                id=1,
+                name="oldA",
+                phone="+12345678901",
+                api_id=1,
+                api_hash_encrypted="test",
+                private_message_enabled=False,
+            )
+        )
+        db.add(
+            Account(
+                id=2,
+                name="oldB",
+                phone="+12345678902",
+                api_id=1,
+                api_hash_encrypted="test",
+                private_message_enabled=True,
+            )
+        )
+        db.add(
+            RelayTask(
+                name="old",
+                account_a=1,
+                account_b=2,
+                source_chats="[-1001]",
+                relay_chat=-1002,
+                keywords="咨询",
+                template="你好",
+            )
+        )
+        db.flush()
+        migrate_profiles(db)
+        migrate_profiles(db)
+        assert db.query(AccountProfile).count() == 2
+        assert db.get(AccountProfile, 1).monitor_chat_ids == "[-1001]"
+        assert db.get(AccountProfile, 2).role == "sender"

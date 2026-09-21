@@ -7,7 +7,7 @@ from telethon.tl.types import User
 from telethon.errors import FloodWaitError, UserPrivacyRestrictedError
 from app.database import session_scope
 from app.models import Account, UserGuard
-from app.relay_models import RelayTask, RelayJob
+from app.relay_models import RelayTask, RelayJob, AccountProfile
 from app.relay_logic import filter_message, format_relay, parse_relay
 from app.relay_engine import RelayEngine
 
@@ -43,6 +43,14 @@ def seed():
             enabled=True,
         )
         db.add(t)
+        db.add_all(
+            [
+                AccountProfile(
+                    account_id=1, role="monitor", monitor_chat_ids="[-1001]"
+                ),
+                AccountProfile(account_id=2, role="sender", monitor_chat_ids="[]"),
+            ]
+        )
         db.flush()
         return t
 
@@ -279,3 +287,16 @@ def test_two_step_login_resumes_without_reusing_code(monkeypatch):
     with session_scope() as db:
         assert db.get(ConsoleState, "login_2fa:1") is None
         assert db.get(Account, 1).status == "active"
+
+
+def test_monitor_account_scope_is_enforced_before_fetching_sender():
+    seed()
+    e = engine()
+    # Even a stale task that names this group cannot override the account scope.
+    with session_scope() as db:
+        db.get(AccountProfile, 1).monitor_chat_ids = "[]"
+    ev = event(-1001, User(id=999, username="target_user"), "咨询")
+    asyncio.run(e.on_message(1, ev))
+    ev.get_sender.assert_not_awaited()
+    with session_scope() as db:
+        assert db.query(RelayJob).count() == 0

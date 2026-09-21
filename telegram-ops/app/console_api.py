@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Account, Chat, UserGuard
 from app.crypto import encrypt_text, decrypt_text
-from app.relay_models import RelayTask, RelayJob, ConsoleState
+from app.relay_models import RelayTask, RelayJob, ConsoleState, AccountProfile
+from app.account_settings import get_profile
 from app.relay_logic import filter_message, format_relay, render_copy
 from app.relay_engine import manager
 from app.workers import send_login_code, verify_login_code, sync_account_chats
@@ -23,9 +24,12 @@ def required(db, cls, id):
     return item
 
 
-def account_json(a):
+def account_json(a, db):
+    profile = get_profile(db, a)
     connected = a.id in manager.workers and manager.workers[a.id].client.is_connected()
     return dict(
+        role=profile.role,
+        monitor_chat_ids=json.loads(profile.monitor_chat_ids),
         id=a.id,
         name=a.name,
         phone=a.phone,
@@ -62,15 +66,79 @@ def task_json(t):
 
 
 class AccountInput(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
     phone: str = Field(pattern=r"^\+[1-9][0-9]{6,14}$")
+    role: str = Field(pattern="^(monitor|sender)$")
+
+
+class ApplicationInput(BaseModel):
     api_id: int = Field(gt=0)
-    api_hash: str = Field(pattern=r"^[a-fA-F0-9]{32}$")
-    private_message_enabled: bool = False
-    proxy_host: str = Field(default="", max_length=255)
-    proxy_port: int | None = Field(default=None, ge=1, le=65535)
-    proxy_username: str = ""
-    proxy_password: str = ""
+    api_hash: str = Field(default="", pattern=r"^([a-fA-F0-9]{32})?$")
+
+
+def application_settings(db):
+    row = db.get(ConsoleState, "telegram_application")
+    return json.loads(row.value) if row else None
+
+
+@router.put("/api/application")
+def save_application(data: ApplicationInput, db: Session = Depends(get_db)):
+    existing = application_settings(db)
+    if not data.api_hash and (not existing or data.api_id != existing["api_id"]):
+        raise HTTPException(422, "首次配置或更换 API ID 时必须填写对应 API Hash")
+    payload = {
+        "api_id": data.api_id,
+        "api_hash_encrypted": encrypt_text(data.api_hash)
+        if data.api_hash
+        else existing["api_hash_encrypted"],
+    }
+    db.merge(ConsoleState(key="telegram_application", value=json.dumps(payload)))
+    db.commit()
+    return {"configured": True, "api_id": data.api_id}
+
+
+class MonitorGroupsInput(BaseModel):
+    chat_ids: list[int] = Field(max_length=200)
+
+    @field_validator("chat_ids", mode="before")
+    @classmethod
+    def valid_ids(cls, values):
+        if not isinstance(values, list) or any(
+            type(v) is not int or v >= 0 or v < -(2**52) for v in values
+        ):
+            raise ValueError("群组 ID 必须是完整的负整数，例如 -1001234567890")
+        return sorted(set(values))
+
+
+@router.put("/api/accounts/{id}/monitor-groups")
+async def monitor_groups(
+    id: int, data: MonitorGroupsInput, db: Session = Depends(get_db)
+):
+    a = required(db, Account, id)
+    profile = get_profile(db, a)
+    if profile.role != "monitor":
+        raise HTTPException(422, "只有监测账号可以配置监测群组")
+    async with manager.lock:
+        profile.monitor_chat_ids = json.dumps(data.chat_ids)
+        affected = 0
+        for task in db.query(RelayTask).filter(RelayTask.account_a == id).all():
+            current = set(json.loads(task.source_chats))
+            if not current.issubset(data.chat_ids):
+                task.source_chats = json.dumps(
+                    sorted(current.intersection(data.chat_ids))
+                )
+                task.enabled = False
+                affected += 1
+                db.query(RelayJob).filter(
+                    RelayJob.task_id == task.id,
+                    RelayJob.status.in_(["pending", "waiting"]),
+                ).update({"status": "cancelled", "error": "监测群组范围已更改"})
+        db.commit()
+    return {
+        "chat_ids": data.chat_ids,
+        "paused_tasks": affected,
+        "message": "监测群组已保存"
+        + (f"，{affected} 条受影响任务已暂停" if affected else ""),
+    }
 
 
 class VerifyInput(BaseModel):
@@ -109,11 +177,12 @@ def validate_task(db, data):
         raise HTTPException(422, "A 和 B 必须使用不同账号")
     if data.relay_chat in data.source_chats:
         raise HTTPException(422, "中转群不能同时作为来源群")
-    available = {
-        c.telegram_chat_id for c in db.query(Chat).filter(Chat.account_id == a.id).all()
-    }
+    pa, pb = get_profile(db, a), get_profile(db, b)
+    if pa.role != "monitor" or pb.role != "sender":
+        raise HTTPException(422, "A 必须选择监测账号，B 必须选择私信账号")
+    available = set(json.loads(pa.monitor_chat_ids))
     if not set(data.source_chats).issubset(available):
-        raise HTTPException(422, "来源群必须从 A 已同步的群组中选择")
+        raise HTTPException(422, "请先在监测账号管理中设置这些来源群组 ID")
     for account in (a, b):
         relay = (
             db.query(Chat)
@@ -141,7 +210,11 @@ def state(db: Session = Depends(get_db)):
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     return dict(
         running=manager.running,
-        accounts=[account_json(a) for a in accounts],
+        accounts=[account_json(a, db) for a in accounts],
+        application={
+            "configured": bool(application_settings(db)),
+            "api_id": (application_settings(db) or {}).get("api_id"),
+        },
         tasks=[task_json(t) for t in tasks],
         chats=[
             dict(
@@ -177,25 +250,24 @@ def state(db: Session = Depends(get_db)):
 def add_account(data: AccountInput, db: Session = Depends(get_db)):
     if db.query(Account).filter(Account.phone == data.phone).first():
         raise HTTPException(409, "这个手机号已经添加")
-    if bool(data.proxy_host) != bool(data.proxy_port):
-        raise HTTPException(422, "代理地址和端口需要同时填写")
+    config = application_settings(db)
+    if not config:
+        raise HTTPException(400, "请先在系统设置完成 Telegram 应用配置，再登录账号")
     a = Account(
-        name=data.name,
+        name=("监测账号" if data.role == "monitor" else "私信账号")
+        + " "
+        + data.phone[-4:],
         phone=data.phone,
-        api_id=data.api_id,
-        api_hash_encrypted=encrypt_text(data.api_hash),
+        api_id=config["api_id"],
+        api_hash_encrypted=config["api_hash_encrypted"],
         send_enabled=True,
-        private_message_enabled=data.private_message_enabled,
-        proxy_enabled=bool(data.proxy_host),
-        proxy_type="socks5",
-        proxy_host=data.proxy_host,
-        proxy_port=data.proxy_port,
-        proxy_username=data.proxy_username,
-        proxy_password_encrypted=encrypt_text(data.proxy_password),
+        private_message_enabled=data.role == "sender",
     )
     db.add(a)
+    db.flush()
+    db.add(AccountProfile(account_id=a.id, role=data.role, monitor_chat_ids="[]"))
     db.commit()
-    return account_json(a)
+    return account_json(a, db)
 
 
 @router.post("/api/accounts/{id}/permissions")
