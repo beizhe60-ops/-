@@ -13,7 +13,9 @@ from app.crypto import encrypt_text
 from app.database import get_db, init_db
 from app.enums import ACCOUNT_STATUS_DISABLED
 from app.models import Account, Chat, Lead, Rule, SendLog, SendQueue, UserGuard
-from app.workers import manager, send_login_code, sync_account_chats, verify_login_code
+from app.workers import send_login_code, sync_account_chats, verify_login_code
+from app.relay_engine import manager
+from app.console_api import router as console_router
 
 
 settings = get_settings()
@@ -22,15 +24,37 @@ templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.app_secret_key == "change-me-at-least-32-chars" or (settings.admin_password == "admin123456" and not settings.admin_password_hash):
+        raise RuntimeError("请先运行 scripts/setup_console.py 生成独立后台凭据")
     init_db()
-    if settings.auto_start_telegram_workers:
+    from app.database import session_scope
+    from app.relay_models import ConsoleState
+    # One process owns Telegram sessions and delivery queue.
+    import fcntl
+    from pathlib import Path
+    from app.database import engine
+    lock_path = Path(engine.url.database).resolve().with_suffix(".runtime.lock") if engine.dialect.name == "sqlite" and engine.url.database else Path(".console-runtime.lock")
+    process_lock = open(lock_path, "w")
+    try:
+        fcntl.flock(process_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        process_lock.close()
+        raise RuntimeError("Only one console server process may run per working directory")
+    with session_scope() as db:
+        saved = db.get(ConsoleState, "running")
+        should_start = saved.value == "true" if saved else settings.auto_start_telegram_workers
+    if should_start:
         await manager.start()
-    yield
-    await manager.stop()
+    try:
+        yield
+    finally:
+        await manager.stop()
+        process_lock.close()
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
+app.include_router(console_router)
 
 
 PUBLIC_PATH_PREFIXES = ("/static", "/admin/login", "/favicon.ico")
@@ -39,14 +63,25 @@ PUBLIC_PATH_PREFIXES = ("/static", "/admin/login", "/favicon.ico")
 @app.middleware("http")
 async def require_admin_auth(request: Request, call_next):
     path = request.url.path
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        from urllib.parse import urlparse
+        origin = request.headers.get("origin")
+        if origin and urlparse(origin).netloc != request.headers.get("host"):
+            return JSONResponse({"detail": "请求来源不匹配"}, status_code=403)
+        if path.startswith("/api/") and request.headers.get("x-console-request") != "1":
+            return JSONResponse({"detail": "缺少请求校验标记"}, status_code=403)
     client_ip = request.client.host if request.client else None
     if not client_ip_allowed(client_ip):
         return JSONResponse({"detail": "ip is not allowed"}, status_code=403)
     if path in ("/healthz",) or any(path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
         return await call_next(request)
     if current_admin(request):
-        return await call_next(request)
-    if "text/html" in request.headers.get("accept", "") or request.method == "GET":
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+    if not path.startswith("/api/") and ("text/html" in request.headers.get("accept", "") or request.method == "GET"):
         next_url = str(request.url.path)
         if request.url.query:
             next_url += "?" + request.url.query
@@ -55,7 +90,7 @@ async def require_admin_auth(request: Request, call_next):
 
 
 def redirect(path: str) -> RedirectResponse:
-    return RedirectResponse(path, status_code=303)
+    return RedirectResponse(path if path.startswith("/") and not path.startswith("//") and "\\" not in path else "/console", status_code=303)
 
 
 @app.get("/admin/login", response_class=HTMLResponse)
@@ -94,6 +129,7 @@ def admin_logout():
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
+    return redirect("/console")
     data = {
         "accounts": db.query(Account).count(),
         "active_accounts": db.query(Account).filter(Account.status == "active").count(),
@@ -317,3 +353,10 @@ def logs_page(request: Request, db: Session = Depends(get_db)):
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "workers": list(manager.workers.keys())}
+
+
+from fastapi.exceptions import RequestValidationError
+@app.exception_handler(RequestValidationError)
+async def validation_error(request, exc):
+    fields = [str(e['loc'][-1]) + ': ' + e['msg'] for e in exc.errors()]
+    return JSONResponse({'detail': '；'.join(fields)}, status_code=422)

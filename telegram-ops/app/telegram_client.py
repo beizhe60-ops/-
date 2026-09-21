@@ -30,4 +30,6 @@ def make_client(account: Account, session_string: str | None = None) -> Telegram
         account.api_id,
         api_hash,
         proxy=build_proxy(account),
+        flood_sleep_threshold=0,
+        request_retries=0,
     )

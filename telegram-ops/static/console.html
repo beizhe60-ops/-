@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Telegram Ops · 消息工作台</title>
+    <link rel="stylesheet" href="/static/console.css" />
+    <script defer src="/static/console.js"></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a href="/console" class="brand"
+        ><span class="brand-icon">↗</span
+        ><span>Telegram Ops<small>消息工作台</small></span></a
+      >
+      <div class="nav-label">工作空间</div>
+      <nav aria-label="主导航">
+        <a href="/console" data-page="overview"><span>◫</span>运行概览</a
+        ><a href="/console/accounts" data-page="accounts"
+          ><span>◎</span>账号管理</a
+        ><a href="/console/tasks" data-page="tasks"><span>⇄</span>任务与过滤</a
+        ><a href="/console/records" data-page="records"
+          ><span>≡</span>消息记录</a
+        ><a href="/console/guards" data-page="guards"><span>⊘</span>不再联系</a
+        ><a href="/console/settings" data-page="settings" class="mobile-only"
+          >系统设置</a
+        ><a href="/admin/logout" class="mobile-only">退出</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <a href="/console/settings" data-page="settings">⚙　系统设置</a>
+        <div class="profile">
+          <span class="avatar">管</span>
+          <div>管理员<small>私有工作空间</small></div>
+          <a href="/admin/logout" title="退出后台" aria-label="退出后台">↪</a>
+        </div>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <span class="breadcrumb"
+          >工作空间 <span>/</span> <b id="crumb">运行概览</b></span
+        >
+        <div class="toolbar">
+          <span id="service-badge" class="badge">加载中</span
+          ><button id="service-button" class="button secondary" disabled>
+            读取服务状态
+          </button>
+        </div>
+      </header>
+      <main id="content" tabindex="-1">
+        <div class="empty">正在读取工作空间…</div>
+      </main>
+      <footer>Telegram Ops <span>账号与消息保存在你的服务器</span></footer>
+    </div>
+    <dialog id="modal">
+      <div class="modal-head">
+        <h2 id="modal-title"></h2>
+        <button
+          type="button"
+          class="icon-button"
+          id="close-modal"
+          aria-label="关闭"
+        >
+          ×
+        </button>
+      </div>
+      <div id="modal-body"></div>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

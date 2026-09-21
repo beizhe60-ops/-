@@ -17,3 +17,9 @@ telegram-ops/*.session
 telegram-ops/*.session-journal
 telegram-ops/telegram_ops.db
 telegram-ops/telegram_ops.db-*
+.local-access.json
+.console-runtime.lock
+telegram-ops/.console-runtime.lock
+artifacts/
+
+*.runtime.lock

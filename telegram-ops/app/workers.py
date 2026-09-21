@@ -410,6 +410,10 @@ async def send_login_code(account_id: int) -> None:
         session_string = StringSession.save(client.session)
         with session_scope() as db:
             account = db.get(Account, account_id)
+            from app.relay_models import ConsoleState
+            flag = db.get(ConsoleState, f"login_2fa:{account_id}")
+            if flag:
+                db.delete(flag)
             account.phone_code_hash = sent.phone_code_hash
             account.login_temp_session_string_encrypted = encrypt_text(session_string)
             account.status = ACCOUNT_STATUS_LOGIN_REQUIRED
@@ -428,12 +432,28 @@ async def verify_login_code(account_id: int, code: str, password: str | None = N
         phone_code_hash = account.phone_code_hash
     await client.connect()
     try:
-        try:
-            await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
-        except SessionPasswordNeededError:
+        from app.relay_models import ConsoleState
+        key = f"login_2fa:{account_id}"
+        with session_scope() as db:
+            needs_password = db.get(ConsoleState, key) is not None
+        if needs_password:
             if not password:
                 raise ValueError("two-step password is required")
             await client.sign_in(password=password)
+        else:
+            try:
+                await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
+            except SessionPasswordNeededError:
+                if not password:
+                    with session_scope() as db:
+                        db.merge(ConsoleState(key=key, value="true"))
+                        db.get(Account, account_id).login_temp_session_string_encrypted = encrypt_text(StringSession.save(client.session))
+                    raise ValueError("two-step password is required")
+                await client.sign_in(password=password)
+        with session_scope() as db:
+            flag = db.get(ConsoleState, key)
+            if flag:
+                db.delete(flag)
         session_string = StringSession.save(client.session)
         with session_scope() as db:
             account = db.get(Account, account_id)

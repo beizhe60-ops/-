@@ -37,10 +37,30 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return False
 
 
+def configured_password_hash() -> str:
+    from app.database import session_scope
+    from app.relay_models import ConsoleState
+    from sqlalchemy.exc import SQLAlchemyError
+    try:
+        with session_scope() as db:
+            value = db.get(ConsoleState, "admin_password_hash")
+            if value:
+                return value.value
+    except SQLAlchemyError:
+        pass  # Before first database initialization.
+    return get_settings().admin_password_hash
+
+
+def signing_key() -> bytes:
+    settings = get_settings()
+    return (settings.app_secret_key + "|" + configured_password_hash()).encode("utf-8")
+
+
 def admin_password_ok(password: str) -> bool:
     settings = get_settings()
-    if settings.admin_password_hash:
-        return verify_password(password, settings.admin_password_hash)
+    stored = configured_password_hash()
+    if stored:
+        return verify_password(password, stored)
     if not settings.admin_password:
         return False
     return secrets.compare_digest(password, settings.admin_password)
@@ -50,7 +70,7 @@ def create_session_token(username: str) -> str:
     settings = get_settings()
     expires_at = int(time.time() + settings.admin_session_hours * 3600)
     payload = f"{username}|{expires_at}"
-    sig = hmac.new(settings.app_secret_key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
+    sig = hmac.new(signing_key(), payload.encode("utf-8"), hashlib.sha256).digest()
     return f"{_b64(payload.encode('utf-8'))}.{_b64(sig)}"
 
 
@@ -61,7 +81,7 @@ def verify_session_token(token: str | None) -> str | None:
     try:
         payload_b64, sig_b64 = token.split(".", 1)
         payload = _unb64(payload_b64).decode("utf-8")
-        expected_sig = hmac.new(settings.app_secret_key.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
+        expected_sig = hmac.new(signing_key(), payload.encode("utf-8"), hashlib.sha256).digest()
         if not hmac.compare_digest(_b64(expected_sig), sig_b64):
             return None
         username, expires_at = payload.rsplit("|", 1)

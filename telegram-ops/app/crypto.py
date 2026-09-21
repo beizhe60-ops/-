@@ -33,5 +33,4 @@ def decrypt_text(value: Optional[str]) -> Optional[str]:
     try:
         return _fernet().decrypt(value.encode("utf-8")).decode("utf-8")
     except InvalidToken:
-        # Keep backward compatibility with early/dev rows that may have been stored as plaintext.
-        return value
+        raise ValueError("无法解密账号凭据，请检查服务器密钥")

@@ -33,7 +33,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expi
 
 
 def init_db() -> None:
-    from app import models  # noqa: F401
+    from app import models, relay_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 
