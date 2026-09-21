@@ -1,4 +1,5 @@
 import json
+from typing import Annotated
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -13,6 +14,7 @@ from app.relay_models import (
     ConsoleState,
     AccountProfile,
     SenderWeight,
+    SenderBinding,
 )
 from app.account_settings import get_profile
 from app.relay_logic import filter_message, format_relay, render_copy
@@ -33,7 +35,10 @@ def required(db, cls, id):
 def account_json(a, db):
     profile = get_profile(db, a)
     connected = a.id in manager.workers and manager.workers[a.id].client.is_connected()
+    binding = db.get(SenderBinding, a.id)
     return dict(
+        receive_chat_ids=json.loads(binding.chat_ids) if binding else [],
+        dm_template=binding.template if binding else "",
         role=profile.role,
         rotation_weight=(
             db.get(SenderWeight, a.id).weight if db.get(SenderWeight, a.id) else 1
@@ -70,6 +75,7 @@ def task_json(t):
                 "enabled",
             )
         },
+        "account_b": None if t.account_b == t.account_a else t.account_b,
         "source_chats": json.loads(t.source_chats),
     }
 
@@ -120,8 +126,52 @@ async def save_weight(id: int, data: WeightInput, db: Session = Depends(get_db))
     return {"rotation_weight": data.weight}
 
 
+GroupID = Annotated[int, Field(strict=True, ge=-(2**52), lt=0)]
+
+
+class ReceiveGroupsInput(BaseModel):
+    chat_ids: list[GroupID] = Field(max_length=200)
+    template: str = Field(default="", max_length=3500)
+
+    @field_validator("chat_ids")
+    @classmethod
+    def unique_ids(cls, v):
+        return sorted(set(v))
+
+
+@router.put("/api/accounts/{id}/receive-groups")
+async def receive_groups(
+    id: int, data: ReceiveGroupsInput, db: Session = Depends(get_db)
+):
+    account = required(db, Account, id)
+    if get_profile(db, account).role != "sender":
+        raise HTTPException(422, "只有私信账号可以绑定接收群组")
+    if data.chat_ids and not data.template.strip():
+        raise HTTPException(422, "绑定接收群组时请填写私信文案")
+    async with manager.lock:
+        old = db.get(SenderBinding, id)
+        template_changed = old is not None and old.template != data.template.strip()
+        pending = db.query(RelayJob).filter(
+            RelayJob.account_id == id,
+            RelayJob.stage == "dm",
+            RelayJob.status.in_(["pending", "waiting"]),
+        )
+        for job in pending.all():
+            if template_changed or job.chat_id not in data.chat_ids:
+                job.status, job.error = "cancelled", "接收群组绑定或私信文案已更改"
+        db.merge(
+            SenderBinding(
+                account_id=id,
+                chat_ids=json.dumps(data.chat_ids),
+                template=data.template.strip(),
+            )
+        )
+        db.commit()
+    return {"chat_ids": data.chat_ids, "message": "接收群组与私信文案已保存"}
+
+
 class MonitorGroupsInput(BaseModel):
-    chat_ids: list[int] = Field(max_length=200)
+    chat_ids: list[GroupID] = Field(max_length=200)
 
     @field_validator("chat_ids", mode="before")
     @classmethod
@@ -178,16 +228,18 @@ class PermissionsInput(BaseModel):
 class TaskInput(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     account_a: int
-    account_b: int
-    source_chats: list[int] = Field(min_length=1, max_length=200)
-    relay_chat: int = Field(lt=0)
+    account_b: int | None = (
+        None  # Legacy API compatibility; not required for monitoring.
+    )
+    source_chats: list[GroupID] = Field(min_length=1, max_length=200)
+    relay_chat: GroupID
     keywords: str = Field(min_length=1, max_length=4000)
     exclude_keywords: str = Field(default="", max_length=4000)
     ignore_users: str = Field(default="", max_length=4000)
     match_mode: str = Field(default="any", pattern="^(any|all|exact)$")
-    template: str = Field(min_length=1, max_length=3500)
+    template: str = Field(default="", max_length=3500)
 
-    @field_validator("keywords", "template", "name")
+    @field_validator("keywords", "name")
     @classmethod
     def not_blank(cls, v):
         if not v.strip():
@@ -196,27 +248,23 @@ class TaskInput(BaseModel):
 
 
 def validate_task(db, data):
-    a, b = required(db, Account, data.account_a), required(db, Account, data.account_b)
-    if a.id == b.id:
-        raise HTTPException(422, "A 和 B 必须使用不同账号")
+    a = required(db, Account, data.account_a)
+    if get_profile(db, a).role != "monitor":
+        raise HTTPException(422, "请选择监测账号")
     if data.relay_chat in data.source_chats:
-        raise HTTPException(422, "中转群不能同时作为来源群")
-    pa, pb = get_profile(db, a), get_profile(db, b)
-    if pa.role != "monitor" or pb.role != "sender":
-        raise HTTPException(422, "A 必须选择监测账号，B 必须选择私信账号")
-    available = set(json.loads(pa.monitor_chat_ids))
-    if not set(data.source_chats).issubset(available):
-        raise HTTPException(422, "请先在监测账号管理中设置这些来源群组 ID")
-    for account in (a, b):
-        relay = (
-            db.query(Chat)
-            .filter(
-                Chat.account_id == account.id, Chat.telegram_chat_id == data.relay_chat
-            )
-            .first()
-        )
-        if not relay or relay.type == "channel":
-            raise HTTPException(422, "A、B 都需要加入中转群并同步群组列表")
+        raise HTTPException(422, "转发群不能同时作为监测来源群")
+    if data.account_b is not None:
+        b = required(db, Account, data.account_b)
+        if a.id == b.id or get_profile(db, b).role != "sender":
+            raise HTTPException(422, "B 必须为独立私信账号")
+    # Direct IDs are authoritative. Dialog synchronization is informational only.
+
+
+def register_monitor_scope(db, account_id, sources):
+    profile = get_profile(db, required(db, Account, account_id))
+    profile.monitor_chat_ids = json.dumps(
+        sorted(set(json.loads(profile.monitor_chat_ids)) | set(sources))
+    )
 
 
 @router.get("/console")
@@ -290,6 +338,8 @@ def add_account(data: AccountInput, db: Session = Depends(get_db)):
     db.add(a)
     db.flush()
     db.add(AccountProfile(account_id=a.id, role=data.role, monitor_chat_ids="[]"))
+    if data.role == "sender":
+        db.add(SenderBinding(account_id=a.id, chat_ids="[]", template=""))
     db.commit()
     return account_json(a, db)
 
@@ -385,6 +435,9 @@ async def add_task(data: TaskInput, db: Session = Depends(get_db)):
     validate_task(db, data)
     values = data.model_dump()
     values["source_chats"] = json.dumps(sorted(set(data.source_chats)))
+    # Keep the old non-null storage column compatible; execution never uses it as a receiver.
+    values["account_b"] = data.account_b or data.account_a
+    register_monitor_scope(db, data.account_a, data.source_chats)
     t = RelayTask(**values, enabled=False)
     db.add(t)
     db.commit()
@@ -396,7 +449,10 @@ async def edit_task(id: int, data: TaskInput, db: Session = Depends(get_db)):
     validate_task(db, data)
     async with manager.lock:
         t = required(db, RelayTask, id)
-        for key, value in data.model_dump().items():
+        register_monitor_scope(db, data.account_a, data.source_chats)
+        values = data.model_dump()
+        values["account_b"] = data.account_b or data.account_a
+        for key, value in values.items():
             setattr(
                 t,
                 key,
@@ -414,22 +470,23 @@ async def edit_task(id: int, data: TaskInput, db: Session = Depends(get_db)):
 def toggle_task(id: int, db: Session = Depends(get_db)):
     t = required(db, RelayTask, id)
     if not t.enabled:
+        if not json.loads(t.source_chats):
+            raise HTTPException(422, "请先绑定至少一个监测群组 ID")
         validate_task(
             db,
             TaskInput(
                 **{k: v for k, v in task_json(t).items() if k not in ("id", "enabled")}
             ),
         )
-        for aid in (t.account_a, t.account_b):
+        for aid in (t.account_a,):
             a = required(db, Account, aid)
             if (
                 not a.session_string_encrypted
                 or not a.send_enabled
                 or a.status != "active"
             ):
-                raise HTTPException(400, "请先完成 A/B 账号登录，并允许账号发送消息")
-        if not db.get(Account, t.account_b).private_message_enabled:
-            raise HTTPException(400, "请先在账号管理中允许 B 发送私信")
+                raise HTTPException(400, "请先登录监测账号，并允许转发消息")
+
     t.enabled = not t.enabled
     db.commit()
     return task_json(t)
@@ -493,6 +550,7 @@ def records(
                     "username",
                     "user_id",
                     "source_title",
+                    "chat_id",
                     "original_text",
                     "text",
                     "status",

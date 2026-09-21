@@ -1085,3 +1085,10 @@ dialog:has(.simple-login) {
     font-size: 12px;
   }
 }
+
+.group-binding-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border, #dce6ee);
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}

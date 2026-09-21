@@ -81,3 +81,10 @@ class SenderWeight(Base):
     __tablename__ = "sender_weights"
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
     weight: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class SenderBinding(Base, TimestampMixin):
+    __tablename__ = "sender_bindings"
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
+    chat_ids: Mapped[str] = mapped_column(Text, default="[]")
+    template: Mapped[str] = mapped_column(Text, default="")

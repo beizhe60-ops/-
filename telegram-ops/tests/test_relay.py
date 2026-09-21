@@ -7,7 +7,7 @@ from telethon.tl.types import User
 from telethon.errors import FloodWaitError, UserPrivacyRestrictedError
 from app.database import session_scope
 from app.models import Account, UserGuard
-from app.relay_models import RelayTask, RelayJob, AccountProfile
+from app.relay_models import RelayTask, RelayJob, AccountProfile, SenderBinding
 from app.relay_logic import filter_message, format_relay, parse_relay
 from app.relay_engine import RelayEngine
 
@@ -50,6 +50,11 @@ def seed():
                 ),
                 AccountProfile(account_id=2, role="sender", monitor_chat_ids="[]"),
             ]
+        )
+        db.add(
+            SenderBinding(
+                account_id=2, chat_ids="[-1002]", template="您好 {{ username }}"
+            )
         )
         db.flush()
         return t
@@ -328,6 +333,7 @@ def test_weighted_rotation_persists_and_duplicate_does_not_advance():
             Chat(account_id=3, telegram_chat_id=-1002, title="relay", type="supergroup")
         )
         db.add(SenderWeight(account_id=2, weight=3))
+        db.add(SenderBinding(account_id=3, chat_ids="[-1002]", template="您好"))
     e.workers[3] = e.workers[2]
     for mid in range(8):
         dm(e, t, mid)
@@ -351,3 +357,117 @@ def test_weighted_rotation_persists_and_duplicate_does_not_advance():
     with session_scope() as db:
         # No eligible sender: retain original receiver and let it wait.
         assert db.query(RelayJob).filter_by(message_id=9).one().account_id == 2
+
+
+def test_monitor_only_forwards_exact_destination_without_sender():
+    t = seed()
+    with session_scope() as db:
+        t = db.get(RelayTask, t.id)
+        t.account_b = t.account_a
+        t.template = ""
+        db.get(SenderBinding, 2).chat_ids = "[]"
+    e = engine()
+    del e.workers[2]
+
+    async def run():
+        await e.on_message(
+            1, event(-1009, User(id=999, username="target_user"), "咨询")
+        )
+        await e.on_message(
+            1, event(-1001, User(id=999, username="target_user"), "咨询")
+        )
+        await e.process_pending_queue()
+
+    asyncio.run(run())
+    assert e.workers[1].client.send_message.await_count == 1
+    assert e.workers[1].client.send_message.await_args.args[0] == -1002
+
+
+def test_explicit_receivers_replace_fixed_b_and_deduplicate_events():
+    from app.models import Chat
+
+    t = seed()
+    with session_scope() as db:
+        db.get(RelayTask, t.id).template = ""
+        for aid in [3, 4]:
+            db.add(
+                Account(
+                    id=aid,
+                    name=f"B{aid}",
+                    phone=f"+1234567890{aid}",
+                    api_id=1,
+                    api_hash_encrypted="test",
+                    status="active",
+                    send_enabled=True,
+                    private_message_enabled=True,
+                )
+            )
+            db.flush()
+            db.add(AccountProfile(account_id=aid, role="sender"))
+            db.add(
+                Chat(
+                    account_id=aid,
+                    telegram_chat_id=-1002,
+                    title="same name",
+                    type="supergroup",
+                )
+            )
+        db.add(
+            SenderBinding(
+                account_id=3, chat_ids="[-1002]", template="绑定文案 {{ username }}"
+            )
+        )
+        db.get(SenderBinding, 2).chat_ids = "[-1009]"
+    e = engine()
+    e.workers[3] = e.workers[2]
+    e.workers[4] = e.workers[2]
+
+    async def run():
+        incoming = event(
+            -1002, User(id=111, username="account_a"), "群-咨询-@target_user"
+        )
+        await e.on_message(2, incoming)  # old fixed B is no longer bound
+        await e.on_message(4, incoming)  # synced membership does not grant a binding
+        with session_scope() as db:
+            assert db.query(RelayJob).count() == 0
+        await e.on_message(3, incoming)
+        await e.on_message(3, incoming)
+        await e.on_message(
+            3, event(-1009, User(id=111, username="account_a"), incoming.raw_text)
+        )
+        with session_scope() as db:
+            jobs = db.query(RelayJob).all()
+            assert len(jobs) == 1 and jobs[0].account_id == 3
+            assert jobs[0].text == "绑定文案 @target_user"
+        await e.process_pending_queue()
+
+    asyncio.run(run())
+    assert e.workers[3].client.send_message.await_count == 1
+
+
+def test_binding_removed_before_send_blocks_queued_message():
+    t = seed()
+    e = engine()
+    dm(e, t)
+    with session_scope() as db:
+        db.get(SenderBinding, 2).chat_ids = "[-1009]"
+    asyncio.run(e.process_pending_queue())
+    e.workers[2].client.send_message.assert_not_awaited()
+    with session_scope() as db:
+        assert db.query(RelayJob).one().status == "cancelled"
+
+
+def test_route_changed_during_sender_lookup_drops_stale_event():
+    t = seed()
+    e = engine()
+    ev = event(-1001, User(id=999, username="target_user"), "咨询")
+
+    async def change_route():
+        with session_scope() as db:
+            db.get(RelayTask, t.id).relay_chat = -1009
+        return User(id=999, username="target_user")
+
+    ev.get_sender = change_route
+    asyncio.run(e.on_message(1, ev))
+    with session_scope() as db:
+        assert db.query(RelayJob).count() == 0

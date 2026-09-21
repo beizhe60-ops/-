@@ -123,7 +123,7 @@ def test_task_validation_edit():
         )
         for bad in [
             {"account_b": 1},
-            {"source_chats": [-999]},
+            {"source_chats": ["-999"]},
             {"source_chats": [-1002]},
         ]:
             assert (
@@ -399,3 +399,149 @@ def test_sender_weight_validation_and_persistence():
         )
         accounts = c.get("/api/state").json()["accounts"]
         assert next(a for a in accounts if a["id"] == 2)["rotation_weight"] == 3
+
+
+def test_direct_group_bindings_monitor_only_without_synced_chats():
+    from app.relay_models import RelayTask
+
+    with TestClient(app) as c:
+        login(c)
+        seed()
+        with session_scope() as db:
+            db.query(Chat).delete()
+            db.get(Account, 2).status = "login_required"
+        payload = dict(
+            name="独立监测",
+            account_a=1,
+            source_chats=[-1001234567890],
+            relay_chat=-1009876543210,
+            keywords="咨询",
+        )
+        for field, bad_values in [
+            ("relay_chat", [1, 0, True, "-1002", -1.5, -(2**52) - 1]),
+            ("source_chats", [[True], [1], ["-1001"], [], [-1.5]]),
+        ]:
+            for value in bad_values:
+                assert (
+                    c.post(
+                        "/api/tasks", headers=HEAD, json={**payload, field: value}
+                    ).status_code
+                    == 422
+                )
+        result = c.post("/api/tasks", headers=HEAD, json=payload)
+        assert result.status_code == 200, result.text
+        task = result.json()
+        assert task["account_b"] is None
+        assert c.post(f"/api/tasks/{task['id']}/toggle", headers=HEAD).json()["enabled"]
+        with session_scope() as db:
+            assert db.get(RelayTask, task["id"]).relay_chat == -1009876543210
+            assert "-1001234567890" in db.get(AccountProfile, 1).monitor_chat_ids
+
+
+def test_receive_bindings_validation_and_pending_cancellation():
+    from app.relay_models import RelayTask, SenderBinding
+
+    with TestClient(app) as c:
+        login(c)
+        seed()
+        assert (
+            c.put(
+                "/api/accounts/1/receive-groups",
+                headers=HEAD,
+                json={"chat_ids": [-1002], "template": "你好"},
+            ).status_code
+            == 422
+        )
+        for bad in [[1], [True], ["-1002"], [-1.2], [-(2**52) - 1]]:
+            assert (
+                c.put(
+                    "/api/accounts/2/receive-groups",
+                    headers=HEAD,
+                    json={"chat_ids": bad, "template": "你好"},
+                ).status_code
+                == 422
+            )
+        assert (
+            c.put(
+                "/api/accounts/2/receive-groups",
+                headers=HEAD,
+                json={"chat_ids": [-1002], "template": " "},
+            ).status_code
+            == 422
+        )
+        payload = {"chat_ids": [-1002, -1003, -1002], "template": "你好"}
+        assert c.put(
+            "/api/accounts/2/receive-groups", headers=HEAD, json=payload
+        ).json()["chat_ids"] == [-1003, -1002]
+        with session_scope() as db:
+            task = RelayTask(
+                account_a=1,
+                account_b=1,
+                name="scope",
+                source_chats="[-1001]",
+                relay_chat=-1002,
+                keywords="咨询",
+                template="",
+                enabled=True,
+            )
+            db.add(task)
+            db.flush()
+            for gid in [-1002, -1003]:
+                db.add(
+                    RelayJob(
+                        task_id=task.id,
+                        stage="dm",
+                        account_id=2,
+                        chat_id=gid,
+                        message_id=1,
+                        username="target_user",
+                        original_text="咨询",
+                        text="你好",
+                    )
+                )
+        c.put(
+            "/api/accounts/2/receive-groups",
+            headers=HEAD,
+            json={**payload, "chat_ids": [-1003]},
+        )
+        with session_scope() as db:
+            assert (
+                db.query(RelayJob).filter_by(chat_id=-1002).one().status == "cancelled"
+            )
+            assert db.query(RelayJob).filter_by(chat_id=-1003).one().status == "pending"
+        c.put(
+            "/api/accounts/2/receive-groups",
+            headers=HEAD,
+            json={"chat_ids": [], "template": ""},
+        )
+        with session_scope() as db:
+            assert all(j.status == "cancelled" for j in db.query(RelayJob))
+            assert db.get(SenderBinding, 2).chat_ids == "[]"
+        assert c.get("/api/state").json()["accounts"][1]["receive_chat_ids"] == []
+
+
+def test_binding_migration_only_explicit_legacy_receiver_and_no_resurrection():
+    from app.relay_models import RelayTask, SenderBinding
+    from app.account_settings import migrate_profiles
+
+    seed()
+    with session_scope() as db:
+        db.add(
+            RelayTask(
+                name="legacy",
+                account_a=1,
+                account_b=2,
+                source_chats="[-1001]",
+                relay_chat=-1002,
+                keywords="咨询",
+                template="原文案",
+            )
+        )
+        db.flush()
+        migrate_profiles(db)
+        assert db.get(SenderBinding, 2).chat_ids == "[-1002]"
+        assert db.get(SenderBinding, 2).template == "原文案"
+        db.get(SenderBinding, 2).chat_ids = "[]"
+        db.flush()
+        migrate_profiles(db)
+        assert db.get(SenderBinding, 2).chat_ids == "[]"

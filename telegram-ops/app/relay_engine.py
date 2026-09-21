@@ -16,9 +16,9 @@ from telethon.tl.types import User
 
 from app.crypto import decrypt_text
 from app.database import session_scope
-from app.models import Account, UserGuard, Chat
+from app.models import Account, UserGuard
 from app.relay_models import RelayTask, RelayJob, ContactReceipt
-from app.relay_models import AccountProfile, SenderWeight, ConsoleState
+from app.relay_models import AccountProfile, SenderWeight, ConsoleState, SenderBinding
 from app.relay_logic import filter_message, format_relay, parse_relay, render_copy
 from app.telegram_client import make_client
 
@@ -160,6 +160,8 @@ class RelayEngine:
         with session_scope() as db:
             tasks = db.query(RelayTask).filter(RelayTask.enabled.is_(True)).all()
             profile = db.get(AccountProfile, account_id)
+            binding = db.get(SenderBinding, account_id)
+            receive_ids = set(json.loads(binding.chat_ids)) if binding else set()
             monitor_ids = (
                 set(json.loads(profile.monitor_chat_ids))
                 if profile and profile.role == "monitor"
@@ -203,7 +205,7 @@ class RelayEngine:
             if (
                 profile
                 and profile.role == "sender"
-                and account_id == task.account_b
+                and int(event.chat_id) in receive_ids
                 and int(event.chat_id) == task.relay_chat
             ):
                 trusted_id = self.identities.get(task.account_a)
@@ -258,15 +260,8 @@ class RelayEngine:
             .all()
         ):
             worker = self.workers.get(account.id)
-            in_group = (
-                account.id == task.account_b
-                or db.query(Chat.id)
-                .filter(
-                    Chat.account_id == account.id,
-                    Chat.telegram_chat_id == task.relay_chat,
-                )
-                .first()
-            )
+            binding = db.get(SenderBinding, account.id)
+            in_group = binding and task.relay_chat in json.loads(binding.chat_ids)
             if (
                 profile.role != "sender"
                 or not in_group
@@ -284,8 +279,8 @@ class RelayEngine:
             config = db.get(SenderWeight, account.id)
             candidates.append((account.id, config.weight if config else 1))
         if not candidates:
-            # Keep the pending job bound to the task's receiver; never drop a lead.
-            return task.account_b
+            # The receiving account retains a waiting job if every pool member is unavailable.
+            return None
         key = f"sender_rotation:{task.relay_chat}"
         row = db.get(ConsoleState, key)
         old = json.loads(row.value) if row else {}
@@ -322,8 +317,40 @@ class RelayEngine:
                 current = db.get(RelayTask, task.id)
                 if not current or not current.enabled:
                     return
+                # A callback may have awaited Telegram while the route was edited.
+                config_fields = (
+                    "account_a",
+                    "source_chats",
+                    "relay_chat",
+                    "keywords",
+                    "exclude_keywords",
+                    "ignore_users",
+                    "match_mode",
+                    "template",
+                )
+                if any(getattr(current, k) != getattr(task, k) for k in config_fields):
+                    return
+                if stage == "relay":
+                    scope = db.get(AccountProfile, current.account_a)
+                    if (
+                        account_id != current.account_a
+                        or chat_id not in json.loads(current.source_chats)
+                        or not scope
+                        or scope.role != "monitor"
+                        or chat_id not in json.loads(scope.monitor_chat_ids)
+                    ):
+                        return
                 if stage == "dm":
-                    account_id = self.select_sender(db, current)
+                    if chat_id != current.relay_chat or not self.receives(
+                        db, account_id, chat_id
+                    ):
+                        return
+                    account_id = self.select_sender(db, current) or account_id
+                    binding = db.get(SenderBinding, account_id)
+                    template = current.template.strip() or binding.template
+                    if not template.strip():
+                        return
+                    text = render_copy(template, username)
                 db.add(
                     RelayJob(
                         task_id=task.id,
@@ -340,6 +367,31 @@ class RelayEngine:
                 )
         except IntegrityError:
             pass  # Same Telegram event after reconnect: already handled.
+
+    @staticmethod
+    def receives(db, account_id, chat_id):
+        profile = db.get(AccountProfile, account_id)
+        binding = db.get(SenderBinding, account_id)
+        return bool(
+            profile
+            and profile.role == "sender"
+            and binding
+            and chat_id in json.loads(binding.chat_ids)
+        )
+
+    def job_binding_valid(self, db, job, task):
+        if job.stage == "dm":
+            return job.chat_id == task.relay_chat and self.receives(
+                db, job.account_id, job.chat_id
+            )
+        scope = db.get(AccountProfile, job.account_id)
+        return bool(
+            scope
+            and scope.role == "monitor"
+            and job.account_id == task.account_a
+            and job.chat_id in json.loads(scope.monitor_chat_ids)
+            and job.chat_id in json.loads(task.source_chats)
+        )
 
     async def process_pending_queue(self, limit=10):
         async with self.lock:
@@ -368,6 +420,9 @@ class RelayEngine:
                 return
             task = db.get(RelayTask, job.task_id)
             account = db.get(Account, job.account_id)
+            if not task or not self.job_binding_valid(db, job, task):
+                job.status, job.error = "cancelled", "群组绑定已失效"
+                return
             if (
                 not task.enabled
                 or not account
@@ -451,6 +506,9 @@ class RelayEngine:
                     or account.status not in ("active", "flood_wait")
                     or job.status not in ("pending", "waiting")
                 ):
+                    return
+                if not self.job_binding_valid(db, job, task):
+                    job.status, job.error = "cancelled", "群组绑定已失效"
                     return
                 if stage == "dm" and not account.private_message_enabled:
                     return

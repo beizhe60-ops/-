@@ -164,7 +164,7 @@ function tasksList() {
     ? state.tasks
         .map(
           (t) =>
-            `<div class="task-row"><div><div class="actions"><span class="task-name">${E(t.name)}</span>${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}</div><div class="task-flow">${E(accountName(t.account_a))} · ${t.source_chats.length} 个来源群　→　${E(chatName(t.relay_chat))}　→　${E(accountName(t.account_b))}</div><div class="chips">${t.keywords
+            `<div class="task-row"><div><div class="actions"><span class="task-name">${E(t.name)}</span>${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}</div><div class="task-flow">${E(accountName(t.account_a))} · ${t.source_chats.map((g) => E(g)).join("、")}　→　${E(t.relay_chat)}${chatName(t.relay_chat) !== String(t.relay_chat) ? "（" + E(chatName(t.relay_chat)) + "）" : ""} · ${state.accounts.filter((a) => a.role === "sender" && (a.receive_chat_ids || []).includes(t.relay_chat)).length} 个私信账号已绑定</div><div class="chips">${t.keywords
               .split(/[\n,，]/)
               .filter(Boolean)
               .slice(0, 6)
@@ -176,7 +176,7 @@ function tasksList() {
         .join("")
     : empty(
         "创建第一条消息任务",
-        "绑定 A、B 账号与中转群，让筛选和发送按照你的规则运行。",
+        "绑定监测群 ID 与转发目标群 ID，再设置关键词。监测转发可独立运行。",
         "<button data-new-task>新建任务</button>",
       );
 }
@@ -201,23 +201,23 @@ function overview() {
       )
       .join(
         "",
-      )}</div><div class="columns"><section class="panel"><div class="panel-head"><h2>消息任务</h2><a href="/console/tasks">管理全部</a></div>${tasksList()}</section><section class="panel"><div class="panel-head"><h2>开始使用</h2><span class="subtle">${[state.accounts.length >= 2, state.chats.length > 0, state.tasks.length > 0].filter(Boolean).length} / 3</span></div><div class="panel-body"><ol class="checklist">${[
+      )}</div><div class="columns"><section class="panel"><div class="panel-head"><h2>消息任务</h2><a href="/console/tasks">管理全部</a></div>${tasksList()}</section><section class="panel"><div class="panel-head"><h2>开始使用</h2><span class="subtle">${[state.accounts.some((a) => a.role === "monitor" && a.has_session), state.tasks.length > 0, state.tasks.some((t) => t.enabled)].filter(Boolean).length} / 3</span></div><div class="panel-body"><ol class="checklist">${[
       [
-        "添加并登录 A/B 账号",
-        "监听与私信使用独立的账号。",
-        state.accounts.length >= 2,
+        "登录监测账号",
+        "需要自动私信时，再登录私信账号。",
+        state.accounts.some((a) => a.role === "monitor" && a.has_session),
         "accounts",
       ],
       [
-        "同步群组列表",
-        "A、B 都需要加入同一个中转群。",
-        state.chats.length > 0,
+        "绑定功能群组 ID",
+        "监测转发与私信接收分别绑定。",
+        state.tasks.length > 0,
         "accounts",
       ],
       [
         "配置并启用任务",
-        "设置关键词、文案，再启动服务。",
-        state.tasks.length > 0,
+        "核对群组 ID 和关键词，再启动服务。",
+        state.tasks.some((t) => t.enabled),
         "tasks",
       ],
     ]
@@ -240,7 +240,7 @@ function accounts() {
       "监测账号负责读取指定群组，私信账号负责接收线索并发送文案。",
     ) +
     `<div class="account-tabs" role="tablist" aria-label="账号类型"><button role="tab" data-account-tab="monitor" aria-selected="${isMonitor}" class="${isMonitor ? "selected" : ""}">监测账号 <span>${state.accounts.filter((a) => a.role === "monitor").length}</span></button><button role="tab" data-account-tab="sender" aria-selected="${!isMonitor}" class="${!isMonitor ? "selected" : ""}">私信账号 <span>${state.accounts.filter((a) => a.role === "sender").length}</span></button></div>
-    <div class="account-section-head"><div><h2>${roleName}管理</h2><p class="subtle">${isMonitor ? "登录后填写监测群组 ID，只有指定群组的消息会进入筛选。" : "独立登录，按权重分配同一中转群的私信任务；数字越大，分配越多。"}</p></div><button id="add-account">＋ ${roleName}登录</button></div>
+    <div class="account-section-head"><div><h2>${roleName}管理</h2><p class="subtle">${isMonitor ? "绑定监测群组 ID 和转发目标 ID，设置关键词后启用。" : "绑定接收群组 ID 与文案，同一群内按权重分配私信。"}</p></div><button id="add-account">＋ ${roleName}登录</button></div>
     ${!state.application?.configured ? '<div class="callout">首次使用请先在 <a href="/console/settings">系统设置</a> 完成 Telegram 连接配置，之后登录账号只需手机号、验证码和二级登录密码。</div>' : ""}` +
     (items.length
       ? `<div class="account-grid">${items
@@ -248,10 +248,22 @@ function accounts() {
             (
               a,
             ) => `<article class="account-card"><div class="account-top"><div><h3>${E(a.name)}</h3><span class="phone">${E(a.phone)}</span></div>${badge(a.connected ? "active" : a.status, a.connected ? "● 已连接" : undefined)}</div>
-    ${isMonitor ? `<div class="monitor-summary"><div class="actions"><strong>监测群组 ID</strong><span class="badge">${a.monitor_chat_ids.length} 个</span></div>${a.monitor_chat_ids.length ? `<div class="chips">${a.monitor_chat_ids.map((id) => `<span class="chip">${id}</span>`).join("")}</div>` : '<p class="muted">尚未设置，不会监测任何来源群。</p>'}<button class="secondary small" data-monitor-groups="${a.id}">设置监测群组 ID</button></div>` : ""}
+    ${
+      isMonitor
+        ? `<div class="monitor-summary"><strong>监测群组 → 转发群组</strong>${
+            state.tasks
+              .filter((t) => t.account_a === a.id)
+              .map(
+                (t) =>
+                  `<div class="group-binding-row"><div class="chips">${t.source_chats.map((g) => `<span class="chip">${g}</span>`).join("")}</div><p>→ <strong>${t.relay_chat}</strong></p><div class="actions">${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}<button class="secondary small" data-edit-task="${t.id}">编辑绑定</button><button class="secondary small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button></div></div>`,
+              )
+              .join("") || '<p class="muted">尚未绑定，不会监测转发。</p>'
+          }<button class="secondary small" data-monitor-groups="${a.id}">绑定监测与转发群组</button></div>`
+        : `<div class="monitor-summary"><strong>私信接收群组 ID</strong><div class="chips">${(a.receive_chat_ids || []).map((g) => `<span class="chip">${g}</span>`).join("") || '<p class="muted">尚未绑定，不接收消息、不参与轮询。</p>'}</div><button class="secondary small" data-receive-groups="${a.id}">绑定接收群组</button></div>`
+    }
     ${!isMonitor ? `<div class="monitor-summary"><strong>轮询权重 <span class="badge">${a.rotation_weight ?? 1}</span></strong><p class="muted">数字越大，分配的私信越多。默认 1。</p><button class="secondary small" data-weight="${a.id}">设置轮询权重</button></div>` : ""}
     <div class="permission-row">${isMonitor ? "允许转发消息" : "允许发送私信"}<input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled ? "checked" : ""}></div>
-    ${a.last_error ? `<p class="error-text">${E(a.last_error)}</p>` : ""}<div class="actions">${!a.has_session ? `<button class="small" data-login="${a.id}">继续登录</button>` : `<button class="secondary small" data-sync="${a.id}">同步群组</button><button class="text-button small" data-logout-account="${a.id}">退出账号</button>`}</div></article>`,
+    ${a.last_error ? `<p class="error-text">${E(a.last_error)}</p>` : ""}<div class="actions">${!a.has_session ? `<button class="small" data-login="${a.id}">继续登录</button>` : `<button class="secondary small" data-sync="${a.id}">同步群名称（可选）</button><button class="text-button small" data-logout-account="${a.id}">退出账号</button>`}</div></article>`,
           )
           .join("")}</div>`
       : `<div class="panel">${empty("还没有" + roleName, "使用手机号、验证码和二级登录密码完成登录。", `<button id="empty-add-account">${roleName}登录</button>`)}</div>`)
@@ -262,11 +274,11 @@ function tasks() {
   return (
     heading(
       "任务与过滤",
-      "每条任务连接一组来源群、一个中转群和一个私信账号。",
+      "每条绑定指定监测来源群 ID、转发目标群 ID 与过滤规则。私信账号另行绑定接收群 ID。",
       '<div class="actions"><button class="secondary" id="standalone-preview">模拟测试</button><button data-new-task>＋ 新建任务</button></div>',
     ) +
     flow() +
-    `<section class="panel"><div class="panel-head"><h2>全部任务</h2><span class="muted">${state.tasks.length} 条任务</span></div>${tasksList()}</section><div class="callout">转发格式固定为“群组-该用户发言的内容-@用户名”。B 只处理指定 A 发出的标准消息。编辑任务会暂停任务并取消旧的待发送内容，保存后需重新启用。</div>`
+    `<section class="panel"><div class="panel-head"><h2>全部任务</h2><span class="muted">${state.tasks.length} 条任务</span></div>${tasksList()}</section><div class="callout">转发格式固定为“群组-该用户发言的内容-@用户名”。私信账号只处理已绑定群组内、本系统监测账号发送的标准消息。编辑任务会暂停任务并取消旧的待发送内容，保存后需重新启用。</div>`
   );
 }
 async function records() {
@@ -284,7 +296,7 @@ async function records() {
       "查看 A 中转与 B 私信的独立记录，定位每次消息流转的结果。",
       '<button class="secondary" id="refresh-records">刷新记录</button>',
     ) +
-    `<section class="panel"><div class="panel-head"><div class="filters"><input id="record-search" aria-label="按用户名搜索" placeholder="搜索 @用户名" value="${E(recordSearch)}"><select id="record-status" aria-label="发送状态"><option value="">全部状态</option>${["pending", "waiting", "sending", "sent", "failed", "unknown", "skipped", "cancelled"].map((s) => `<option value="${s}" ${recordStatus === s ? "selected" : ""}>${labels[s]}</option>`).join("")}</select><button class="secondary small" id="search-records">筛选</button></div><span class="muted">${r.total} 条记录</span></div>${r.items.length ? `<div class="table-wrap"><table><thead><tr><th>阶段 / 时间</th><th>用户 / 来源</th><th>发送内容</th><th>状态</th><th>操作</th></tr></thead><tbody>${r.items.map((j) => `<tr><td>${j.stage === "relay" ? "A → 中转群" : "B → 私信"}<small>${E(date(j.created_at))}</small><small>任务 #${j.task_id}</small></td><td>@${E(j.username)}<small>${E(j.source_title)}</small>${j.user_id ? `<small>ID ${j.user_id}</small>` : ""}</td><td><div class="record-text">${E(j.text)}</div><details><summary>原始发言</summary><div class="record-text">${E(j.original_text)}</div></details></td><td>${badge(j.status)}${j.error ? `<small class="error-text">${E(j.error)}</small>` : ""}${j.status === "waiting" ? `<small>${E(date(j.due_at))}</small>` : ""}</td><td><div class="actions">${["pending", "waiting"].includes(j.status) ? `<button class="secondary small" data-cancel-job="${j.id}">取消</button>` : ""}${j.user_id ? `<button class="text-button small" data-block-user="${j.user_id}">不再联系</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("没有符合条件的记录", "任务运行后，关键词命中和自动私信结果会显示在这里。")}<div class="pagination"><span>每页 50 条</span><div class="actions"><button class="secondary small" id="prev-page" ${recordOffset === 0 ? "disabled" : ""}>上一页</button><button class="secondary small" id="next-page" ${recordOffset + 50 >= r.total ? "disabled" : ""}>下一页</button></div></div></section>`
+    `<section class="panel"><div class="panel-head"><div class="filters"><input id="record-search" aria-label="按用户名搜索" placeholder="搜索 @用户名" value="${E(recordSearch)}"><select id="record-status" aria-label="发送状态"><option value="">全部状态</option>${["pending", "waiting", "sending", "sent", "failed", "unknown", "skipped", "cancelled"].map((s) => `<option value="${s}" ${recordStatus === s ? "selected" : ""}>${labels[s]}</option>`).join("")}</select><button class="secondary small" id="search-records">筛选</button></div><span class="muted">${r.total} 条记录</span></div>${r.items.length ? `<div class="table-wrap"><table><thead><tr><th>阶段 / 时间</th><th>用户 / 来源</th><th>发送内容</th><th>状态</th><th>操作</th></tr></thead><tbody>${r.items.map((j) => `<tr><td>${j.stage === "relay" ? "A → 中转群" : "B → 私信"}<small>${E(date(j.created_at))}</small><small>任务 #${j.task_id}</small><small>${j.stage === "relay" ? "监测" : "接收"}群 ID ${E(j.chat_id)}</small></td><td>@${E(j.username)}<small>${E(j.source_title)}</small>${j.user_id ? `<small>ID ${j.user_id}</small>` : ""}</td><td><div class="record-text">${E(j.text)}</div><details><summary>原始发言</summary><div class="record-text">${E(j.original_text)}</div></details></td><td>${badge(j.status)}${j.error ? `<small class="error-text">${E(j.error)}</small>` : ""}${j.status === "waiting" ? `<small>${E(date(j.due_at))}</small>` : ""}</td><td><div class="actions">${["pending", "waiting"].includes(j.status) ? `<button class="secondary small" data-cancel-job="${j.id}">取消</button>` : ""}${j.user_id ? `<button class="text-button small" data-block-user="${j.user_id}">不再联系</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("没有符合条件的记录", "任务运行后，关键词命中和自动私信结果会显示在这里。")}<div class="pagination"><span>每页 50 条</span><div class="actions"><button class="secondary small" id="prev-page" ${recordOffset === 0 ? "disabled" : ""}>上一页</button><button class="secondary small" id="next-page" ${recordOffset + 50 >= r.total ? "disabled" : ""}>下一页</button></div></div></section>`
   );
 }
 async function guards() {
@@ -370,42 +382,52 @@ function loginDialog(id, role = accountTab) {
       role === "monitor" ? "登录成功，请设置监测群组 ID" : "私信账号登录成功",
     );
     if (role === "monitor") monitorGroupsDialog(accountId);
+    else receiveGroupsDialog(accountId);
   });
 }
 function monitorGroupsDialog(id) {
-  const a = state.accounts.find((a) => a.id === id);
-  openModal(
-    "设置监测群组 ID",
-    `<form id="monitor-groups-form"><p class="subtle">${E(a.name)} · ${E(a.phone)}</p><label style="margin-top:20px">监测群组 ID<textarea name="chat_ids" rows="6" placeholder="-1001234567890\n-1009876543210">${a.monitor_chat_ids.join("\n")}</textarea><small>每行一个完整群组 ID，或用逗号分隔。留空表示不监测任何来源群。</small></label><div class="callout" style="margin-top:20px">账号需要已经加入这些群组。新增 ID 后可在任务中选择；移除 ID 会立即停止对应来源，并暂停受影响的任务。</div><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存监测群组</button></div></form>`,
-  );
-  setupForm("#monitor-groups-form", async (fd) => {
-    const parts = fd
-      .get("chat_ids")
-      .split(/[\s,，]+/)
-      .filter(Boolean);
-    if (
-      parts.some(
-        (v) => !/^-[1-9][0-9]*$/.test(v) || !Number.isSafeInteger(Number(v)),
-      )
-    )
-      throw Error("请填写完整的负整数群组 ID，例如 -1001234567890");
-    const result = await api(`/accounts/${id}/monitor-groups`, "PUT", {
-      chat_ids: parts.map(Number),
-    });
-    $("#modal").close();
-    await load();
-    toast(result.message);
-  });
+  taskDialog(null, id);
 }
-
 function previewFields() {
   return `<div class="form-grid"><label>示例群名<input id="sample-title" value="示例来源群"></label><label>实际发言者用户名<input id="sample-username" value="example_user"></label><label class="span-2">测试发言<textarea id="sample-text" placeholder="粘贴一条群内发言，验证是否命中"></textarea></label></div><button class="secondary" type="button" id="run-preview" style="margin-top:15px">运行模拟测试</button><div id="preview-result" role="status"></div>`;
 }
-function taskDialog(id) {
+function parseGroupIds(value, allowEmpty = false) {
+  const parts = value.split(/[\s,，]+/).filter(Boolean);
+  if (
+    (!allowEmpty && !parts.length) ||
+    parts.some(
+      (v) =>
+        !/^-[1-9][0-9]*$/.test(v) ||
+        !Number.isSafeInteger(Number(v)) ||
+        Number(v) < -(2 ** 52),
+    )
+  )
+    throw Error(
+      "请填写完整的负整数群组 ID，例如 -1001234567890；多个 ID 用换行或逗号分隔",
+    );
+  return [...new Set(parts.map(Number))];
+}
+function receiveGroupsDialog(id) {
+  const a = state.accounts.find((a) => a.id === id);
+  openModal(
+    "绑定私信接收群组",
+    `<form id="receive-groups-form"><p class="subtle">${E(a.name)} · ${E(a.phone)}</p><label>接收群组 ID<textarea name="chat_ids" rows="4" placeholder="-1001234567890">${E((a.receive_chat_ids || []).join("\n"))}</textarea><small>填写监测账号的转发目标群 ID，每行一个；留空则停止接收。账号需要已加入这些群组。</small></label><label>私信文案<textarea name="template" rows="4" maxlength="3500" placeholder="您好 {{ username }}，这是您咨询的资料。">${E(a.dm_template || "")}</textarea><small>可用 {{ username }} 插入用户名。旧任务如有独立文案，则优先使用任务文案。</small></label><div class="callout">只接收绑定 ID 内、本系统监测账号转发的标准消息。同群内已绑定的私信账号按权重分配。移除 ID 或修改文案会取消受影响的待发送消息。</div><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存接收绑定</button></div></form>`,
+  );
+  setupForm("#receive-groups-form", async (fd) => {
+    const chat_ids = parseGroupIds(fd.get("chat_ids"), true),
+      template = fd.get("template").trim();
+    if (chat_ids.length && !template) throw Error("请填写私信文案");
+    await api(`/accounts/${id}/receive-groups`, "PUT", { chat_ids, template });
+    $("#modal").close();
+    await load();
+    toast("接收群组与私信文案已保存");
+  });
+}
+function taskDialog(id, monitorId) {
   const t = state.tasks.find((t) => t.id === id) || {
     name: "",
-    account_a: state.accounts.find((a) => a.role === "monitor")?.id,
-    account_b: state.accounts.find((a) => a.role === "sender")?.id,
+    account_a:
+      monitorId || state.accounts.find((a) => a.role === "monitor")?.id,
     source_chats: [],
     relay_chat: "",
     keywords: "",
@@ -414,80 +436,45 @@ function taskDialog(id) {
     match_mode: "any",
     template: "",
   };
-  if (
-    !state.accounts.some((a) => a.role === "monitor") ||
-    !state.accounts.some((a) => a.role === "sender")
-  ) {
-    toast("请先分别登录监测账号和私信账号");
+  if (!t.account_a) {
+    toast("请先添加监测账号");
     return;
   }
-  const opts = (selected, role) =>
-    state.accounts
-      .filter((a) => a.role === role)
-      .map(
-        (a) =>
-          `<option value="${a.id}" ${a.id === selected ? "selected" : ""}>${E(a.name)} · ${E(labels[a.status] || a.status)}</option>`,
-      )
-      .join("");
+  const options = state.accounts
+    .filter((a) => a.role === "monitor")
+    .map(
+      (a) =>
+        `<option value="${a.id}" ${a.id === t.account_a ? "selected" : ""}>${E(a.name)} · ${E(a.phone)}</option>`,
+    )
+    .join("");
   openModal(
-    id ? "编辑消息任务" : "新建消息任务",
-    `<form id="task-form"><label>任务名称<input name="name" value="${E(t.name)}" placeholder="例如：产品咨询线索" required maxlength="120"></label><div class="form-section" style="margin-top:26px"><div class="section-title"><span>A</span>来源与筛选</div><div class="form-grid"><label>监听账号<select id="account-a" name="account_a">${opts(t.account_a, "monitor")}</select></label><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><div class="span-2 field">来源群组<div id="source-options" class="checkbox-list"></div><small class="muted">这里只显示该监测账号配置的群组 ID；账号需要已加入群组。</small></div><label>包含关键词<textarea name="keywords" placeholder="每行一个关键词，或用逗号分隔" required>${E(t.keywords)}</textarea></label><label>排除关键词<textarea name="exclude_keywords" placeholder="命中任意排除词则跳过">${E(t.exclude_keywords)}</textarea></label><label class="span-2">忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label></div></div><div class="form-section"><div class="section-title"><span>⇄</span>中转群组</div><label>选择 A、B 共同加入的群<select id="relay-chat" name="relay_chat" required></select></label><p class="preview-label">固定发送格式</p><div class="preview-box">群组-该用户发言的内容-@用户名</div></div><div class="form-section"><div class="section-title"><span>B</span>私信账号与文案</div><div class="form-grid"><label>私信账号<select id="account-b" name="account_b">${opts(t.account_b, "sender")}</select></label><div class="callout" style="margin:0">所选 B 负责接收指定 A 的消息；发送时按同一中转群的私信账号权重分配。正文其他 @提及不会作为收件人。</div><label class="span-2">私信文案<textarea name="template" placeholder="输入实际发送给用户的文案" required maxlength="3500">${E(t.template)}</textarea><small>可用 {{ username }} 插入目标 @用户名；其他内容按原文发送。</small></label></div></div><details class="simulation"><summary>模拟测试过滤与消息格式（不会发送）</summary>${previewFields()}</details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">${id ? "保存更改并暂停" : "保存为暂停任务"}</button></div></form>`,
+    id ? "编辑监测与转发绑定" : "绑定监测与转发群组",
+    `<form id="task-form">
+    <label>绑定名称<input name="name" value="${E(t.name)}" required maxlength="120" placeholder="例如：产品咨询监测"></label>
+    <div class="form-grid" style="margin-top:20px"><label class="span-2">监测账号<select name="account_a">${options}</select></label>
+    <label>监测群组 ID<textarea name="source_chats" rows="4" required placeholder="-1001234567890\n-1009876543210">${E(t.source_chats.join("\n"))}</textarea><small>每行一个完整 ID；只有这些来源群进入筛选。</small></label>
+    <label>转发目标群组 ID<input name="relay_chat" value="${E(t.relay_chat)}" required placeholder="-1001122334455"><small>本条绑定的消息只发送到这个 ID。不同目标可建立多条绑定。</small></label></div>
+    <div class="callout">账号需已加入来源群和目标群，并能在目标群发消息。不需要同步群组列表，也不需要先配置私信账号。</div>
+    <div class="form-section"><div class="section-title">消息过滤</div><div class="form-grid"><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><label>忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label><label>包含关键词<textarea name="keywords" required>${E(t.keywords)}</textarea></label><label>排除关键词<textarea name="exclude_keywords">${E(t.exclude_keywords)}</textarea></label></div></div>
+    <p class="preview-label">固定转发格式</p><div class="preview-box">群组-该用户发言的内容-@用户名</div>
+    ${t.template ? `<details class="simulation"><summary>原任务私信文案（兼容已有配置）</summary><label>任务独立文案<textarea name="template" maxlength="3500">${E(t.template)}</textarea><small>清空后使用私信账号设置的文案。</small></label></details>` : ""}
+    <details class="simulation"><summary>模拟测试过滤与消息格式（不会发送）</summary>${previewFields()}</details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">${id ? "保存更改并暂停" : "保存绑定（暂停）"}</button></div></form>`,
   );
-  function groupOptions(initial = false) {
-    const aid = Number($("#account-a").value),
-      bid = Number($("#account-b").value);
-    const source = (
-      state.accounts.find((a) => a.id === aid)?.monitor_chat_ids || []
-    ).map((id) => ({
-      id,
-      title:
-        state.chats.find((c) => c.id === id && c.account_id === aid)?.title ||
-        "指定群组",
-    }));
-    $("#source-options").innerHTML = source.length
-      ? source
-          .map(
-            (c) =>
-              `<label><input type="checkbox" name="source_chats" value="${c.id}" ${(initial && t.source_chats.includes(c.id)) || (!id && !initial) ? "checked" : ""}>${E(c.title)} <span class="muted">${c.id}</span></label>`,
-          )
-          .join("")
-      : "<p>尚未配置监测群组 ID，请先在监测账号管理中设置。</p>";
-    relayOptions(bid, aid, initial);
-  }
-  function relayOptions(bid, aid, initial = false) {
-    const shared = state.chats.filter(
-      (c) =>
-        c.account_id === aid &&
-        c.type !== "channel" &&
-        state.chats.some(
-          (b) => b.account_id === bid && b.id === c.id && b.type !== "channel",
-        ),
-    );
-    const before = $("#relay-chat").value;
-    $("#relay-chat").innerHTML =
-      '<option value="">请选择中转群</option>' +
-      shared
-        .map(
-          (c) =>
-            `<option value="${c.id}" ${(initial ? t.relay_chat : Number(before)) === c.id ? "selected" : ""}>${E(c.title)}</option>`,
-        )
-        .join("");
-  }
-  groupOptions(true);
-  $("#account-a").onchange = () => groupOptions();
-  $("#account-b").onchange = () =>
-    relayOptions(Number($("#account-b").value), Number($("#account-a").value));
   $("#run-preview").onclick = () => runPreview($("#task-form"));
   setupForm("#task-form", async (fd) => {
     const data = Object.fromEntries(fd);
-    data.account_a = Number(data.account_a);
-    data.account_b = Number(data.account_b);
-    data.relay_chat = Number(data.relay_chat);
-    data.source_chats = fd.getAll("source_chats").map(Number);
+    data.account_a = Number(fd.get("account_a"));
+    data.source_chats = parseGroupIds(fd.get("source_chats"));
+    const target = parseGroupIds(fd.get("relay_chat"));
+    if (target.length !== 1) throw Error("每条绑定只能设置一个转发目标群 ID");
+    data.relay_chat = target[0];
+    if (data.source_chats.includes(data.relay_chat))
+      throw Error("转发群不能同时作为监测来源群");
+    data.template = fd.get("template") || "";
     await api(id ? `/tasks/${id}` : "/tasks", id ? "PUT" : "POST", data);
     $("#modal").close();
     await load();
-    toast("任务已保存为暂停状态，请核对后启用");
+    toast("群组绑定已保存为暂停状态，请核对后启用");
   });
 }
 async function runPreview(form) {
@@ -540,7 +527,7 @@ function weightDialog(id) {
   const a = state.accounts.find((a) => a.id === id);
   openModal(
     "设置轮询权重",
-    `<form id="weight-form"><p class="subtle">${E(a.name)} · ${E(a.phone)}</p><label>轮询权重<input name="weight" type="number" min="1" max="1000" step="1" required value="${a.rotation_weight ?? 1}"></label><p class="muted">范围 1–1000，数字越大，分配比例越高。权重 3 和 1 的账号长期约按 3∶1 分配。同一中转群中已登录、已同步群组且允许发送的私信账号参与轮询。已分配消息不受修改影响。</p><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存权重</button></div></form>`,
+    `<form id="weight-form"><p class="subtle">${E(a.name)} · ${E(a.phone)}</p><label>轮询权重<input name="weight" type="number" min="1" max="1000" step="1" required value="${a.rotation_weight ?? 1}"></label><p class="muted">范围 1–1000，数字越大，分配比例越高。权重 3 和 1 的账号长期约按 3∶1 分配。同一接收群 ID 下已显式绑定、在线且允许发送的私信账号参与轮询。已分配消息不受修改影响。</p><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存权重</button></div></form>`,
   );
   setupForm("#weight-form", async (fd) => {
     await api(`/accounts/${id}/weight`, "PUT", {
@@ -552,6 +539,10 @@ function weightDialog(id) {
   });
 }
 function bindPage() {
+  $$("[data-receive-groups]").forEach(
+    (b) =>
+      (b.onclick = () => receiveGroupsDialog(Number(b.dataset.receiveGroups))),
+  );
   $$("[data-weight]").forEach(
     (b) => (b.onclick = () => weightDialog(Number(b.dataset.weight))),
   );

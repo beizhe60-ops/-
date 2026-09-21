@@ -2,7 +2,7 @@
 
 import json
 from app.models import Account
-from app.relay_models import AccountProfile, RelayTask
+from app.relay_models import AccountProfile, RelayTask, SenderBinding
 
 
 def migrate_profiles(db):
@@ -15,6 +15,24 @@ def migrate_profiles(db):
         db.add(
             AccountProfile(
                 account_id=account.id, role=role, monitor_chat_ids=json.dumps(groups)
+            )
+        )
+    db.flush()
+    # Only explicit legacy task B bindings migrate. A synced dialog never grants scope.
+    for profile in db.query(AccountProfile).filter_by(role="sender").all():
+        if db.get(SenderBinding, profile.account_id):
+            continue
+        tasks = (
+            db.query(RelayTask)
+            .filter_by(account_b=profile.account_id)
+            .order_by(RelayTask.id)
+            .all()
+        )
+        db.add(
+            SenderBinding(
+                account_id=profile.account_id,
+                chat_ids=json.dumps(sorted({t.relay_chat for t in tasks})),
+                template=next((t.template for t in tasks if t.template.strip()), ""),
             )
         )
     db.flush()
