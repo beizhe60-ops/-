@@ -372,3 +372,30 @@ def test_legacy_profiles_migration_is_idempotent():
         assert db.query(AccountProfile).count() == 2
         assert db.get(AccountProfile, 1).monitor_chat_ids == "[-1001]"
         assert db.get(AccountProfile, 2).role == "sender"
+
+
+def test_sender_weight_validation_and_persistence():
+    seed()
+    with TestClient(app) as c:
+        login(c)
+        assert (
+            c.put(
+                "/api/accounts/1/weight", headers=HEAD, json={"weight": 3}
+            ).status_code
+            == 422
+        )
+        for bad in (0, -1, 1001, 1.5, True, "3"):
+            assert (
+                c.put(
+                    "/api/accounts/2/weight", headers=HEAD, json={"weight": bad}
+                ).status_code
+                == 422
+            )
+        assert (
+            c.put(
+                "/api/accounts/2/weight", headers=HEAD, json={"weight": 3}
+            ).status_code
+            == 200
+        )
+        accounts = c.get("/api/state").json()["accounts"]
+        assert next(a for a in accounts if a["id"] == 2)["rotation_weight"] == 3

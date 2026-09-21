@@ -240,7 +240,7 @@ function accounts() {
       "监测账号负责读取指定群组，私信账号负责接收线索并发送文案。",
     ) +
     `<div class="account-tabs" role="tablist" aria-label="账号类型"><button role="tab" data-account-tab="monitor" aria-selected="${isMonitor}" class="${isMonitor ? "selected" : ""}">监测账号 <span>${state.accounts.filter((a) => a.role === "monitor").length}</span></button><button role="tab" data-account-tab="sender" aria-selected="${!isMonitor}" class="${!isMonitor ? "selected" : ""}">私信账号 <span>${state.accounts.filter((a) => a.role === "sender").length}</span></button></div>
-    <div class="account-section-head"><div><h2>${roleName}管理</h2><p class="subtle">${isMonitor ? "登录后填写监测群组 ID，只有指定群组的消息会进入筛选。" : "独立登录，用任务中配置的文案自动私信。"}</p></div><button id="add-account">＋ ${roleName}登录</button></div>
+    <div class="account-section-head"><div><h2>${roleName}管理</h2><p class="subtle">${isMonitor ? "登录后填写监测群组 ID，只有指定群组的消息会进入筛选。" : "独立登录，按权重分配同一中转群的私信任务；数字越大，分配越多。"}</p></div><button id="add-account">＋ ${roleName}登录</button></div>
     ${!state.application?.configured ? '<div class="callout">首次使用请先在 <a href="/console/settings">系统设置</a> 完成 Telegram 连接配置，之后登录账号只需手机号、验证码和二级登录密码。</div>' : ""}` +
     (items.length
       ? `<div class="account-grid">${items
@@ -249,6 +249,7 @@ function accounts() {
               a,
             ) => `<article class="account-card"><div class="account-top"><div><h3>${E(a.name)}</h3><span class="phone">${E(a.phone)}</span></div>${badge(a.connected ? "active" : a.status, a.connected ? "● 已连接" : undefined)}</div>
     ${isMonitor ? `<div class="monitor-summary"><div class="actions"><strong>监测群组 ID</strong><span class="badge">${a.monitor_chat_ids.length} 个</span></div>${a.monitor_chat_ids.length ? `<div class="chips">${a.monitor_chat_ids.map((id) => `<span class="chip">${id}</span>`).join("")}</div>` : '<p class="muted">尚未设置，不会监测任何来源群。</p>'}<button class="secondary small" data-monitor-groups="${a.id}">设置监测群组 ID</button></div>` : ""}
+    ${!isMonitor ? `<div class="monitor-summary"><strong>轮询权重 <span class="badge">${a.rotation_weight ?? 1}</span></strong><p class="muted">数字越大，分配的私信越多。默认 1。</p><button class="secondary small" data-weight="${a.id}">设置轮询权重</button></div>` : ""}
     <div class="permission-row">${isMonitor ? "允许转发消息" : "允许发送私信"}<input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled ? "checked" : ""}></div>
     ${a.last_error ? `<p class="error-text">${E(a.last_error)}</p>` : ""}<div class="actions">${!a.has_session ? `<button class="small" data-login="${a.id}">继续登录</button>` : `<button class="secondary small" data-sync="${a.id}">同步群组</button><button class="text-button small" data-logout-account="${a.id}">退出账号</button>`}</div></article>`,
           )
@@ -430,7 +431,7 @@ function taskDialog(id) {
       .join("");
   openModal(
     id ? "编辑消息任务" : "新建消息任务",
-    `<form id="task-form"><label>任务名称<input name="name" value="${E(t.name)}" placeholder="例如：产品咨询线索" required maxlength="120"></label><div class="form-section" style="margin-top:26px"><div class="section-title"><span>A</span>来源与筛选</div><div class="form-grid"><label>监听账号<select id="account-a" name="account_a">${opts(t.account_a, "monitor")}</select></label><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><div class="span-2 field">来源群组<div id="source-options" class="checkbox-list"></div><small class="muted">这里只显示该监测账号配置的群组 ID；账号需要已加入群组。</small></div><label>包含关键词<textarea name="keywords" placeholder="每行一个关键词，或用逗号分隔" required>${E(t.keywords)}</textarea></label><label>排除关键词<textarea name="exclude_keywords" placeholder="命中任意排除词则跳过">${E(t.exclude_keywords)}</textarea></label><label class="span-2">忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label></div></div><div class="form-section"><div class="section-title"><span>⇄</span>中转群组</div><label>选择 A、B 共同加入的群<select id="relay-chat" name="relay_chat" required></select></label><p class="preview-label">固定发送格式</p><div class="preview-box">群组-该用户发言的内容-@用户名</div></div><div class="form-section"><div class="section-title"><span>B</span>私信账号与文案</div><div class="form-grid"><label>私信账号<select id="account-b" name="account_b">${opts(t.account_b, "sender")}</select></label><div class="callout" style="margin:0">B 仅处理指定 A 发送的消息，正文中其他 @提及不会作为收件人。</div><label class="span-2">私信文案<textarea name="template" placeholder="输入实际发送给用户的文案" required maxlength="3500">${E(t.template)}</textarea><small>可用 {{ username }} 插入目标 @用户名；其他内容按原文发送。</small></label></div></div><details class="simulation"><summary>模拟测试过滤与消息格式（不会发送）</summary>${previewFields()}</details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">${id ? "保存更改并暂停" : "保存为暂停任务"}</button></div></form>`,
+    `<form id="task-form"><label>任务名称<input name="name" value="${E(t.name)}" placeholder="例如：产品咨询线索" required maxlength="120"></label><div class="form-section" style="margin-top:26px"><div class="section-title"><span>A</span>来源与筛选</div><div class="form-grid"><label>监听账号<select id="account-a" name="account_a">${opts(t.account_a, "monitor")}</select></label><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><div class="span-2 field">来源群组<div id="source-options" class="checkbox-list"></div><small class="muted">这里只显示该监测账号配置的群组 ID；账号需要已加入群组。</small></div><label>包含关键词<textarea name="keywords" placeholder="每行一个关键词，或用逗号分隔" required>${E(t.keywords)}</textarea></label><label>排除关键词<textarea name="exclude_keywords" placeholder="命中任意排除词则跳过">${E(t.exclude_keywords)}</textarea></label><label class="span-2">忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label></div></div><div class="form-section"><div class="section-title"><span>⇄</span>中转群组</div><label>选择 A、B 共同加入的群<select id="relay-chat" name="relay_chat" required></select></label><p class="preview-label">固定发送格式</p><div class="preview-box">群组-该用户发言的内容-@用户名</div></div><div class="form-section"><div class="section-title"><span>B</span>私信账号与文案</div><div class="form-grid"><label>私信账号<select id="account-b" name="account_b">${opts(t.account_b, "sender")}</select></label><div class="callout" style="margin:0">所选 B 负责接收指定 A 的消息；发送时按同一中转群的私信账号权重分配。正文其他 @提及不会作为收件人。</div><label class="span-2">私信文案<textarea name="template" placeholder="输入实际发送给用户的文案" required maxlength="3500">${E(t.template)}</textarea><small>可用 {{ username }} 插入目标 @用户名；其他内容按原文发送。</small></label></div></div><details class="simulation"><summary>模拟测试过滤与消息格式（不会发送）</summary>${previewFields()}</details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">${id ? "保存更改并暂停" : "保存为暂停任务"}</button></div></form>`,
   );
   function groupOptions(initial = false) {
     const aid = Number($("#account-a").value),
@@ -535,7 +536,25 @@ function guardDialog(userId = "") {
     await load();
   });
 }
+function weightDialog(id) {
+  const a = state.accounts.find((a) => a.id === id);
+  openModal(
+    "设置轮询权重",
+    `<form id="weight-form"><p class="subtle">${E(a.name)} · ${E(a.phone)}</p><label>轮询权重<input name="weight" type="number" min="1" max="1000" step="1" required value="${a.rotation_weight ?? 1}"></label><p class="muted">范围 1–1000，数字越大，分配比例越高。权重 3 和 1 的账号长期约按 3∶1 分配。同一中转群中已登录、已同步群组且允许发送的私信账号参与轮询。已分配消息不受修改影响。</p><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存权重</button></div></form>`,
+  );
+  setupForm("#weight-form", async (fd) => {
+    await api(`/accounts/${id}/weight`, "PUT", {
+      weight: Number(fd.get("weight")),
+    });
+    $("#modal").close();
+    await load();
+    toast("轮询权重已保存");
+  });
+}
 function bindPage() {
+  $$("[data-weight]").forEach(
+    (b) => (b.onclick = () => weightDialog(Number(b.dataset.weight))),
+  );
   $$("[data-account-tab]").forEach(
     (b) =>
       (b.onclick = () => {

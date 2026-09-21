@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Account, Chat, UserGuard
 from app.crypto import encrypt_text, decrypt_text
-from app.relay_models import RelayTask, RelayJob, ConsoleState, AccountProfile
+from app.relay_models import (
+    RelayTask,
+    RelayJob,
+    ConsoleState,
+    AccountProfile,
+    SenderWeight,
+)
 from app.account_settings import get_profile
 from app.relay_logic import filter_message, format_relay, render_copy
 from app.relay_engine import manager
@@ -29,6 +35,9 @@ def account_json(a, db):
     connected = a.id in manager.workers and manager.workers[a.id].client.is_connected()
     return dict(
         role=profile.role,
+        rotation_weight=(
+            db.get(SenderWeight, a.id).weight if db.get(SenderWeight, a.id) else 1
+        ),
         monitor_chat_ids=json.loads(profile.monitor_chat_ids),
         id=a.id,
         name=a.name,
@@ -94,6 +103,21 @@ def save_application(data: ApplicationInput, db: Session = Depends(get_db)):
     db.merge(ConsoleState(key="telegram_application", value=json.dumps(payload)))
     db.commit()
     return {"configured": True, "api_id": data.api_id}
+
+
+class WeightInput(BaseModel):
+    weight: int = Field(strict=True, ge=1, le=1000)
+
+
+@router.put("/api/accounts/{id}/weight")
+async def save_weight(id: int, data: WeightInput, db: Session = Depends(get_db)):
+    account = required(db, Account, id)
+    if get_profile(db, account).role != "sender":
+        raise HTTPException(422, "只有私信账号可以设置轮询权重")
+    async with manager.lock:
+        db.merge(SenderWeight(account_id=id, weight=data.weight))
+        db.commit()
+    return {"rotation_weight": data.weight}
 
 
 class MonitorGroupsInput(BaseModel):

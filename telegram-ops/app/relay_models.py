@@ -75,3 +75,9 @@ class AccountProfile(Base, TimestampMixin):
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
     role: Mapped[str] = mapped_column(String(16), default="monitor")
     monitor_chat_ids: Mapped[str] = mapped_column(Text, default="[]")
+
+
+class SenderWeight(Base):
+    __tablename__ = "sender_weights"
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
+    weight: Mapped[int] = mapped_column(Integer, default=1)

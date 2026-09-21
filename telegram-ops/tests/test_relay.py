@@ -300,3 +300,54 @@ def test_monitor_account_scope_is_enforced_before_fetching_sender():
     ev.get_sender.assert_not_awaited()
     with session_scope() as db:
         assert db.query(RelayJob).count() == 0
+
+
+def test_weighted_rotation_persists_and_duplicate_does_not_advance():
+    from app.models import Chat
+    from app.relay_models import SenderWeight, ConsoleState
+    from collections import Counter
+
+    t = seed()
+    e = engine()
+    with session_scope() as db:
+        db.add(
+            Account(
+                id=3,
+                name="B3",
+                phone="+12345678903",
+                api_id=1,
+                api_hash_encrypted="test",
+                status="active",
+                send_enabled=True,
+                private_message_enabled=True,
+            )
+        )
+        db.flush()
+        db.add(AccountProfile(account_id=3, role="sender"))
+        db.add(
+            Chat(account_id=3, telegram_chat_id=-1002, title="relay", type="supergroup")
+        )
+        db.add(SenderWeight(account_id=2, weight=3))
+    e.workers[3] = e.workers[2]
+    for mid in range(8):
+        dm(e, t, mid)
+        if mid == 3:
+            e2 = engine()
+            e2.workers[3] = e2.workers[2]
+            e = e2
+    with session_scope() as db:
+        counts = Counter(j.account_id for j in db.query(RelayJob).all())
+        assert counts == {2: 6, 3: 2}
+        before = db.get(ConsoleState, "sender_rotation:-1002").value
+    dm(e, t, 7)
+    with session_scope() as db:
+        assert db.get(ConsoleState, "sender_rotation:-1002").value == before
+        db.get(Account, 2).send_enabled = False
+    dm(e, t, 8)
+    with session_scope() as db:
+        assert db.query(RelayJob).filter_by(message_id=8).one().account_id == 3
+        db.get(Account, 3).flood_wait_until = datetime(2099, 1, 1)
+    dm(e, t, 9)
+    with session_scope() as db:
+        # No eligible sender: retain original receiver and let it wait.
+        assert db.query(RelayJob).filter_by(message_id=9).one().account_id == 2

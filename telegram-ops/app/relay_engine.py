@@ -16,9 +16,9 @@ from telethon.tl.types import User
 
 from app.crypto import decrypt_text
 from app.database import session_scope
-from app.models import Account, UserGuard
+from app.models import Account, UserGuard, Chat
 from app.relay_models import RelayTask, RelayJob, ContactReceipt
-from app.relay_models import AccountProfile
+from app.relay_models import AccountProfile, SenderWeight, ConsoleState
 from app.relay_logic import filter_message, format_relay, parse_relay, render_copy
 from app.telegram_client import make_client
 
@@ -248,6 +248,61 @@ class RelayEngine:
                     render_copy(task.template, parsed.username),
                 )
 
+    def select_sender(self, db, task):
+        """Persist smooth weighted round-robin state atomically with each new job."""
+        candidates = []
+        for account, profile in (
+            db.query(Account, AccountProfile)
+            .join(AccountProfile, AccountProfile.account_id == Account.id)
+            .order_by(Account.id)
+            .all()
+        ):
+            worker = self.workers.get(account.id)
+            in_group = (
+                account.id == task.account_b
+                or db.query(Chat.id)
+                .filter(
+                    Chat.account_id == account.id,
+                    Chat.telegram_chat_id == task.relay_chat,
+                )
+                .first()
+            )
+            if (
+                profile.role != "sender"
+                or not in_group
+                or account.status != "active"
+                or not account.send_enabled
+                or not account.private_message_enabled
+                or not worker
+                or not worker.client.is_connected()
+                or (
+                    account.flood_wait_until
+                    and account.flood_wait_until > datetime.utcnow()
+                )
+            ):
+                continue
+            config = db.get(SenderWeight, account.id)
+            candidates.append((account.id, config.weight if config else 1))
+        if not candidates:
+            # Keep the pending job bound to the task's receiver; never drop a lead.
+            return task.account_b
+        key = f"sender_rotation:{task.relay_chat}"
+        row = db.get(ConsoleState, key)
+        old = json.loads(row.value) if row else {}
+        signature = [[aid, weight] for aid, weight in candidates]
+        scores = old.get("scores", {}) if old.get("members") == signature else {}
+        scores = {
+            str(aid): scores.get(str(aid), 0) + weight for aid, weight in candidates
+        }
+        selected = max(candidates, key=lambda item: scores[str(item[0])])[0]
+        scores[str(selected)] -= sum(weight for _, weight in candidates)
+        db.merge(
+            ConsoleState(
+                key=key, value=json.dumps({"members": signature, "scores": scores})
+            )
+        )
+        return selected
+
     def enqueue(
         self,
         task,
@@ -267,6 +322,8 @@ class RelayEngine:
                 current = db.get(RelayTask, task.id)
                 if not current or not current.enabled:
                     return
+                if stage == "dm":
+                    account_id = self.select_sender(db, current)
                 db.add(
                     RelayJob(
                         task_id=task.id,
