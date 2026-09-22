@@ -31,7 +31,7 @@ def migrate_profiles(db):
         db.add(
             SenderBinding(
                 account_id=profile.account_id,
-                chat_ids=json.dumps(sorted({t.relay_chat for t in tasks})),
+                chat_ids=json.dumps(sorted({t.relay_chat for t in tasks if t.relay_chat is not None})),
                 template=next((t.template for t in tasks if t.template.strip()), ""),
             )
         )

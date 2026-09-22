@@ -1,0 +1,16 @@
+[
+  {
+    "mobile": false,
+    "unchangedOverviewTicks": 2,
+    "unchangedContentReplacements": 0,
+    "errors": [],
+    "scenarios": "changed metrics/focus/scroll, in-flight modal draft, pending service, copy/weight save, pagination rollback, filter retry, double click, refresh failure/recovery"
+  },
+  {
+    "mobile": true,
+    "unchangedOverviewTicks": 2,
+    "unchangedContentReplacements": 0,
+    "errors": [],
+    "scenarios": "changed metrics/focus/scroll, in-flight modal draft, pending service, copy/weight save, pagination rollback, filter retry, double click, refresh failure/recovery"
+  }
+]

@@ -1,0 +1,344 @@
+{
+  "environment": {
+    "python": "3.12.13",
+    "sqlite": "3.53.4"
+  },
+  "datasets": [
+    {
+      "accounts": 2,
+      "tasks": 1,
+      "chats": 40,
+      "jobs": 100,
+      "startup_warm_ms": 49.485,
+      "api": {
+        "/api/state": {
+          "mean_ms": 3.645,
+          "p95_ms": 3.827,
+          "max_ms": 4.29,
+          "queries_per_request": 17,
+          "bytes": 3919,
+          "sql_ms": 0.211,
+          "max_sql_ms": 0.027,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 3,
+            "SELECT accounts.id AS accounts_id, accounts.name AS accounts_name, accounts.phone AS accounts_phone, accounts.api_id AS accounts_api_id, accounts.api_hash_encrypted AS accounts_api_hash_encrypted, accounts.session_string_encrypted AS accounts_session_string_encrypted, accounts.login_temp_session_string_encrypted AS accounts_login_temp_session_string_encrypted, accounts.phone_code_hash AS accounts_phone_code_hash, accounts.status AS accounts_status, accounts.risk_status AS accounts_risk_status, accounts.send_enabled AS accounts_send_enabled, accounts.private_message_enabled AS accounts_private_message_enabled, accounts.proxy_enabled AS accounts_proxy_enabled, accounts.proxy_type AS accounts_proxy_type, accounts.proxy_host AS accounts_proxy_host, accounts.proxy_port AS accounts_proxy_port, accounts.proxy_username AS accounts_proxy_username, accounts.proxy_password_encrypted AS accounts_proxy_password_encrypted, accounts.flood_wait_until AS accounts_flood_wait_until, accounts.last_health_check_at AS accounts_last_health_check_at, accounts.last_error AS accounts_last_error, accounts.created_at AS accounts_created_at, accounts.updated_at AS accounts_updated_at FROM accounts ORDER BY accounts.id": 1,
+            "SELECT relay_tasks.id AS relay_tasks_id, relay_tasks.name AS relay_tasks_name, relay_tasks.account_a AS relay_tasks_account_a, relay_tasks.account_b AS relay_tasks_account_b, relay_tasks.source_chats AS relay_tasks_source_chats, relay_tasks.relay_chat AS relay_tasks_relay_chat, relay_tasks.keywords AS relay_tasks_keywords, relay_tasks.exclude_keywords AS relay_tasks_exclude_keywords, relay_tasks.ignore_users AS relay_tasks_ignore_users, relay_tasks.match_mode AS relay_tasks_match_mode, relay_tasks.template AS relay_tasks_template, relay_tasks.enabled AS relay_tasks_enabled, relay_tasks.created_at AS relay_tasks_created_at, relay_tasks.updated_at AS relay_tasks_updated_at FROM relay_tasks ORDER BY relay_tasks.id DESC": 1,
+            "SELECT account_profiles.account_id AS account_profiles_account_id, account_profiles.role AS account_profiles_role, account_profiles.monitor_chat_ids AS account_profiles_monitor_chat_ids, account_profiles.created_at AS account_profiles_created_at, account_profiles.updated_at AS account_profiles_updated_at FROM account_profiles WHERE account_profiles.account_id = ?": 2,
+            "SELECT sender_bindings.account_id AS sender_bindings_account_id, sender_bindings.chat_ids AS sender_bindings_chat_ids, sender_bindings.template AS sender_bindings_template, sender_bindings.created_at AS sender_bindings_created_at, sender_bindings.updated_at AS sender_bindings_updated_at FROM sender_bindings WHERE sender_bindings.account_id = ?": 2,
+            "SELECT sender_weights.account_id AS sender_weights_account_id, sender_weights.weight AS sender_weights_weight FROM sender_weights WHERE sender_weights.account_id = ?": 3,
+            "SELECT chats.id AS chats_id, chats.account_id AS chats_account_id, chats.telegram_chat_id AS chats_telegram_chat_id, chats.access_hash AS chats_access_hash, chats.title AS chats_title, chats.type AS chats_type, chats.enabled AS chats_enabled, chats.is_primary_listener AS chats_is_primary_listener, chats.last_sync_at AS chats_last_sync_at, chats.created_at AS chats_created_at, chats.updated_at AS chats_updated_at FROM chats": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.stage = ? AND relay_jobs.created_at >= ?) AS anon_1": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.status IN (?, ?)) AS anon_1": 2,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.stage = ? AND relay_jobs.status = ? AND relay_jobs.sent_at >= ?) AS anon_1": 1
+          }
+        },
+        "/api/records?offset=0": {
+          "mean_ms": 2.697,
+          "p95_ms": 2.909,
+          "max_ms": 3.281,
+          "queries_per_request": 3,
+          "bytes": 16314,
+          "sql_ms": 0.061,
+          "max_sql_ms": 0.035,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/records?q=user_99&offset=0": {
+          "mean_ms": 1.561,
+          "p95_ms": 1.715,
+          "max_ms": 2.366,
+          "queries_per_request": 3,
+          "bytes": 346,
+          "sql_ms": 0.131,
+          "max_sql_ms": 0.082,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE (relay_jobs.username LIKE '%' || ? || '%' ESCAPE '/')) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE (relay_jobs.username LIKE '%' || ? || '%' ESCAPE '/') ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/records?offset=5000": {
+          "mean_ms": 1.479,
+          "p95_ms": 1.772,
+          "max_ms": 1.81,
+          "queries_per_request": 3,
+          "bytes": 24,
+          "sql_ms": 0.081,
+          "max_sql_ms": 0.046,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/guards": {
+          "mean_ms": 1.15,
+          "p95_ms": 1.185,
+          "max_ms": 1.216,
+          "queries_per_request": 2,
+          "bytes": 2,
+          "sql_ms": 0.022,
+          "max_sql_ms": 0.012,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT user_guards.id AS user_guards_id, user_guards.telegram_user_id AS user_guards_telegram_user_id, user_guards.username AS user_guards_username, user_guards.blacklisted AS user_guards_blacklisted, user_guards.unsubscribed AS user_guards_unsubscribed, user_guards.note AS user_guards_note, user_guards.created_at AS user_guards_created_at, user_guards.updated_at AS user_guards_updated_at FROM user_guards WHERE user_guards.blacklisted IS 1": 1
+          }
+        }
+      }
+    },
+    {
+      "accounts": 20,
+      "tasks": 100,
+      "chats": 1000,
+      "jobs": 10000,
+      "startup_warm_ms": 5.947,
+      "api": {
+        "/api/state": {
+          "mean_ms": 26.404,
+          "p95_ms": 26.341,
+          "max_ms": 47.877,
+          "queries_per_request": 89,
+          "bytes": 103214,
+          "sql_ms": 3.124,
+          "max_sql_ms": 1.25,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 3,
+            "SELECT accounts.id AS accounts_id, accounts.name AS accounts_name, accounts.phone AS accounts_phone, accounts.api_id AS accounts_api_id, accounts.api_hash_encrypted AS accounts_api_hash_encrypted, accounts.session_string_encrypted AS accounts_session_string_encrypted, accounts.login_temp_session_string_encrypted AS accounts_login_temp_session_string_encrypted, accounts.phone_code_hash AS accounts_phone_code_hash, accounts.status AS accounts_status, accounts.risk_status AS accounts_risk_status, accounts.send_enabled AS accounts_send_enabled, accounts.private_message_enabled AS accounts_private_message_enabled, accounts.proxy_enabled AS accounts_proxy_enabled, accounts.proxy_type AS accounts_proxy_type, accounts.proxy_host AS accounts_proxy_host, accounts.proxy_port AS accounts_proxy_port, accounts.proxy_username AS accounts_proxy_username, accounts.proxy_password_encrypted AS accounts_proxy_password_encrypted, accounts.flood_wait_until AS accounts_flood_wait_until, accounts.last_health_check_at AS accounts_last_health_check_at, accounts.last_error AS accounts_last_error, accounts.created_at AS accounts_created_at, accounts.updated_at AS accounts_updated_at FROM accounts ORDER BY accounts.id": 1,
+            "SELECT relay_tasks.id AS relay_tasks_id, relay_tasks.name AS relay_tasks_name, relay_tasks.account_a AS relay_tasks_account_a, relay_tasks.account_b AS relay_tasks_account_b, relay_tasks.source_chats AS relay_tasks_source_chats, relay_tasks.relay_chat AS relay_tasks_relay_chat, relay_tasks.keywords AS relay_tasks_keywords, relay_tasks.exclude_keywords AS relay_tasks_exclude_keywords, relay_tasks.ignore_users AS relay_tasks_ignore_users, relay_tasks.match_mode AS relay_tasks_match_mode, relay_tasks.template AS relay_tasks_template, relay_tasks.enabled AS relay_tasks_enabled, relay_tasks.created_at AS relay_tasks_created_at, relay_tasks.updated_at AS relay_tasks_updated_at FROM relay_tasks ORDER BY relay_tasks.id DESC": 1,
+            "SELECT account_profiles.account_id AS account_profiles_account_id, account_profiles.role AS account_profiles_role, account_profiles.monitor_chat_ids AS account_profiles_monitor_chat_ids, account_profiles.created_at AS account_profiles_created_at, account_profiles.updated_at AS account_profiles_updated_at FROM account_profiles WHERE account_profiles.account_id = ?": 20,
+            "SELECT sender_bindings.account_id AS sender_bindings_account_id, sender_bindings.chat_ids AS sender_bindings_chat_ids, sender_bindings.template AS sender_bindings_template, sender_bindings.created_at AS sender_bindings_created_at, sender_bindings.updated_at AS sender_bindings_updated_at FROM sender_bindings WHERE sender_bindings.account_id = ?": 20,
+            "SELECT sender_weights.account_id AS sender_weights_account_id, sender_weights.weight AS sender_weights_weight FROM sender_weights WHERE sender_weights.account_id = ?": 39,
+            "SELECT chats.id AS chats_id, chats.account_id AS chats_account_id, chats.telegram_chat_id AS chats_telegram_chat_id, chats.access_hash AS chats_access_hash, chats.title AS chats_title, chats.type AS chats_type, chats.enabled AS chats_enabled, chats.is_primary_listener AS chats_is_primary_listener, chats.last_sync_at AS chats_last_sync_at, chats.created_at AS chats_created_at, chats.updated_at AS chats_updated_at FROM chats": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.stage = ? AND relay_jobs.created_at >= ?) AS anon_1": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.status IN (?, ?)) AS anon_1": 2,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.stage = ? AND relay_jobs.status = ? AND relay_jobs.sent_at >= ?) AS anon_1": 1
+          }
+        },
+        "/api/records?offset=0": {
+          "mean_ms": 2.791,
+          "p95_ms": 3.128,
+          "max_ms": 3.303,
+          "queries_per_request": 3,
+          "bytes": 16548,
+          "sql_ms": 0.056,
+          "max_sql_ms": 0.028,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/records?q=user_99&offset=0": {
+          "mean_ms": 3.135,
+          "p95_ms": 3.576,
+          "max_ms": 3.767,
+          "queries_per_request": 3,
+          "bytes": 16546,
+          "sql_ms": 0.584,
+          "max_sql_ms": 0.537,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE (relay_jobs.username LIKE '%' || ? || '%' ESCAPE '/')) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE (relay_jobs.username LIKE '%' || ? || '%' ESCAPE '/') ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/records?offset=5000": {
+          "mean_ms": 2.816,
+          "p95_ms": 3.199,
+          "max_ms": 3.221,
+          "queries_per_request": 3,
+          "bytes": 16547,
+          "sql_ms": 0.141,
+          "max_sql_ms": 0.092,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/guards": {
+          "mean_ms": 1.206,
+          "p95_ms": 1.233,
+          "max_ms": 1.419,
+          "queries_per_request": 2,
+          "bytes": 2,
+          "sql_ms": 0.028,
+          "max_sql_ms": 0.017,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT user_guards.id AS user_guards_id, user_guards.telegram_user_id AS user_guards_telegram_user_id, user_guards.username AS user_guards_username, user_guards.blacklisted AS user_guards_blacklisted, user_guards.unsubscribed AS user_guards_unsubscribed, user_guards.note AS user_guards_note, user_guards.created_at AS user_guards_created_at, user_guards.updated_at AS user_guards_updated_at FROM user_guards WHERE user_guards.blacklisted IS 1": 1
+          }
+        }
+      }
+    },
+    {
+      "accounts": 100,
+      "tasks": 500,
+      "chats": 5000,
+      "jobs": 50000,
+      "startup_warm_ms": 19.473,
+      "api": {
+        "/api/state": {
+          "mean_ms": 125.916,
+          "p95_ms": 131.266,
+          "max_ms": 131.382,
+          "queries_per_request": 409,
+          "bytes": 522708,
+          "sql_ms": 15.258,
+          "max_sql_ms": 6.721,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 3,
+            "SELECT accounts.id AS accounts_id, accounts.name AS accounts_name, accounts.phone AS accounts_phone, accounts.api_id AS accounts_api_id, accounts.api_hash_encrypted AS accounts_api_hash_encrypted, accounts.session_string_encrypted AS accounts_session_string_encrypted, accounts.login_temp_session_string_encrypted AS accounts_login_temp_session_string_encrypted, accounts.phone_code_hash AS accounts_phone_code_hash, accounts.status AS accounts_status, accounts.risk_status AS accounts_risk_status, accounts.send_enabled AS accounts_send_enabled, accounts.private_message_enabled AS accounts_private_message_enabled, accounts.proxy_enabled AS accounts_proxy_enabled, accounts.proxy_type AS accounts_proxy_type, accounts.proxy_host AS accounts_proxy_host, accounts.proxy_port AS accounts_proxy_port, accounts.proxy_username AS accounts_proxy_username, accounts.proxy_password_encrypted AS accounts_proxy_password_encrypted, accounts.flood_wait_until AS accounts_flood_wait_until, accounts.last_health_check_at AS accounts_last_health_check_at, accounts.last_error AS accounts_last_error, accounts.created_at AS accounts_created_at, accounts.updated_at AS accounts_updated_at FROM accounts ORDER BY accounts.id": 1,
+            "SELECT relay_tasks.id AS relay_tasks_id, relay_tasks.name AS relay_tasks_name, relay_tasks.account_a AS relay_tasks_account_a, relay_tasks.account_b AS relay_tasks_account_b, relay_tasks.source_chats AS relay_tasks_source_chats, relay_tasks.relay_chat AS relay_tasks_relay_chat, relay_tasks.keywords AS relay_tasks_keywords, relay_tasks.exclude_keywords AS relay_tasks_exclude_keywords, relay_tasks.ignore_users AS relay_tasks_ignore_users, relay_tasks.match_mode AS relay_tasks_match_mode, relay_tasks.template AS relay_tasks_template, relay_tasks.enabled AS relay_tasks_enabled, relay_tasks.created_at AS relay_tasks_created_at, relay_tasks.updated_at AS relay_tasks_updated_at FROM relay_tasks ORDER BY relay_tasks.id DESC": 1,
+            "SELECT account_profiles.account_id AS account_profiles_account_id, account_profiles.role AS account_profiles_role, account_profiles.monitor_chat_ids AS account_profiles_monitor_chat_ids, account_profiles.created_at AS account_profiles_created_at, account_profiles.updated_at AS account_profiles_updated_at FROM account_profiles WHERE account_profiles.account_id = ?": 100,
+            "SELECT sender_bindings.account_id AS sender_bindings_account_id, sender_bindings.chat_ids AS sender_bindings_chat_ids, sender_bindings.template AS sender_bindings_template, sender_bindings.created_at AS sender_bindings_created_at, sender_bindings.updated_at AS sender_bindings_updated_at FROM sender_bindings WHERE sender_bindings.account_id = ?": 100,
+            "SELECT sender_weights.account_id AS sender_weights_account_id, sender_weights.weight AS sender_weights_weight FROM sender_weights WHERE sender_weights.account_id = ?": 199,
+            "SELECT chats.id AS chats_id, chats.account_id AS chats_account_id, chats.telegram_chat_id AS chats_telegram_chat_id, chats.access_hash AS chats_access_hash, chats.title AS chats_title, chats.type AS chats_type, chats.enabled AS chats_enabled, chats.is_primary_listener AS chats_is_primary_listener, chats.last_sync_at AS chats_last_sync_at, chats.created_at AS chats_created_at, chats.updated_at AS chats_updated_at FROM chats": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.stage = ? AND relay_jobs.created_at >= ?) AS anon_1": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.status IN (?, ?)) AS anon_1": 2,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE relay_jobs.stage = ? AND relay_jobs.status = ? AND relay_jobs.sent_at >= ?) AS anon_1": 1
+          }
+        },
+        "/api/records?offset=0": {
+          "mean_ms": 2.62,
+          "p95_ms": 2.721,
+          "max_ms": 2.81,
+          "queries_per_request": 3,
+          "bytes": 16666,
+          "sql_ms": 0.055,
+          "max_sql_ms": 0.028,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/records?q=user_99&offset=0": {
+          "mean_ms": 9.854,
+          "p95_ms": 10.114,
+          "max_ms": 10.128,
+          "queries_per_request": 3,
+          "bytes": 16565,
+          "sql_ms": 6.924,
+          "max_sql_ms": 4.05,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE (relay_jobs.username LIKE '%' || ? || '%' ESCAPE '/')) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs WHERE (relay_jobs.username LIKE '%' || ? || '%' ESCAPE '/') ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/records?offset=5000": {
+          "mean_ms": 2.666,
+          "p95_ms": 2.803,
+          "max_ms": 2.879,
+          "queries_per_request": 3,
+          "bytes": 16666,
+          "sql_ms": 0.104,
+          "max_sql_ms": 0.063,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT count(*) AS count_1 FROM (SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs) AS anon_1": 1,
+            "SELECT relay_jobs.id AS relay_jobs_id, relay_jobs.task_id AS relay_jobs_task_id, relay_jobs.stage AS relay_jobs_stage, relay_jobs.account_id AS relay_jobs_account_id, relay_jobs.chat_id AS relay_jobs_chat_id, relay_jobs.message_id AS relay_jobs_message_id, relay_jobs.user_id AS relay_jobs_user_id, relay_jobs.username AS relay_jobs_username, relay_jobs.source_title AS relay_jobs_source_title, relay_jobs.original_text AS relay_jobs_original_text, relay_jobs.text AS relay_jobs_text, relay_jobs.status AS relay_jobs_status, relay_jobs.error AS relay_jobs_error, relay_jobs.due_at AS relay_jobs_due_at, relay_jobs.sent_at AS relay_jobs_sent_at, relay_jobs.sent_message_id AS relay_jobs_sent_message_id, relay_jobs.created_at AS relay_jobs_created_at, relay_jobs.updated_at AS relay_jobs_updated_at FROM relay_jobs ORDER BY relay_jobs.id DESC LIMIT ? OFFSET ?": 1
+          }
+        },
+        "/api/guards": {
+          "mean_ms": 1.244,
+          "p95_ms": 1.373,
+          "max_ms": 1.522,
+          "queries_per_request": 2,
+          "bytes": 2,
+          "sql_ms": 0.026,
+          "max_sql_ms": 0.016,
+          "query_shapes": {
+            "SELECT console_state.\"key\" AS console_state_key, console_state.value AS console_state_value FROM console_state WHERE console_state.\"key\" = ?": 1,
+            "SELECT user_guards.id AS user_guards_id, user_guards.telegram_user_id AS user_guards_telegram_user_id, user_guards.username AS user_guards_username, user_guards.blacklisted AS user_guards_blacklisted, user_guards.unsubscribed AS user_guards_unsubscribed, user_guards.note AS user_guards_note, user_guards.created_at AS user_guards_created_at, user_guards.updated_at AS user_guards_updated_at FROM user_guards WHERE user_guards.blacklisted IS 1": 1
+          }
+        }
+      }
+    }
+  ],
+  "pragmas": {
+    "journal_mode": "delete",
+    "busy_timeout": 30000,
+    "foreign_keys": 0
+  },
+  "plans": {
+    "hits": [
+      [
+        3,
+        0,
+        216,
+        "SCAN relay_jobs"
+      ]
+    ],
+    "sent": [
+      [
+        4,
+        0,
+        61,
+        "SEARCH relay_jobs USING INDEX ix_relay_jobs_status (status=?)"
+      ]
+    ],
+    "queue": [
+      [
+        6,
+        0,
+        71,
+        "SEARCH relay_jobs USING INDEX ix_relay_jobs_status (status=?)"
+      ],
+      [
+        29,
+        0,
+        45,
+        "SEARCH relay_tasks USING INTEGER PRIMARY KEY (rowid=?)"
+      ],
+      [
+        44,
+        0,
+        0,
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    ],
+    "source_lookup": [
+      [
+        5,
+        0,
+        60,
+        "SEARCH relay_jobs USING INDEX sqlite_autoindex_relay_jobs_1 (task_id=? AND stage=?)"
+      ],
+      [
+        56,
+        0,
+        0,
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    ],
+    "search": [
+      [
+        3,
+        0,
+        216,
+        "SCAN relay_jobs"
+      ]
+    ]
+  },
+  "indexes": [
+    [
+      0,
+      "ix_relay_jobs_status",
+      0,
+      "c",
+      0
+    ],
+    [
+      1,
+      "sqlite_autoindex_relay_jobs_1",
+      1,
+      "u",
+      0
+    ]
+  ]
+}

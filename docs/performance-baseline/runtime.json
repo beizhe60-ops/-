@@ -1,0 +1,26 @@
+{
+  "unbound_event_sql": 3,
+  "dm_enqueue_sql": 12,
+  "configuration_lock_wait_ms": 233.39,
+  "cross_account_send_start_ms": [
+    [
+      "A",
+      2.5820420123636723
+    ],
+    [
+      "B",
+      256.3951249467209
+    ]
+  ],
+  "eligible_11th_sent_after_3_ticks": false,
+  "reload_10": {
+    "clients": 2,
+    "handlers": 2,
+    "workers": 2
+  },
+  "after_stop": {
+    "connected": 0,
+    "workers": 0,
+    "identities": 0
+  }
+}

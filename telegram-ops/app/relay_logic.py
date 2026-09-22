@@ -12,6 +12,11 @@ def words(value: str) -> list[str]:
     ]
 
 
+def keyword_words(value: str) -> list[str]:
+    """Spaces separate keywords; commas and newlines remain supported."""
+    return [x.casefold() for x in re.split(r"[\s,，]+", value or "") if x]
+
+
 def single_line(value: str) -> str:
     return " ".join(value.split())
 
@@ -31,10 +36,10 @@ def filter_message(
     if username.casefold() in ignored or str(user_id) in ignored:
         return False, "用户在忽略名单中"
     lowered = text.casefold()
-    excluded = [w for w in words(task.exclude_keywords) if w in lowered]
+    excluded = [w for w in keyword_words(task.exclude_keywords) if w in lowered]
     if excluded:
         return False, "命中排除词：" + "、".join(excluded)
-    keys = words(task.keywords)
+    keys = keyword_words(task.keywords)
     matched = [
         w
         for w in keys

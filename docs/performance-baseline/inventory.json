@@ -1,0 +1,186 @@
+{
+  "telegram-ops/app/account_settings.py": {
+    "lines": 46,
+    "sha256": "a304572d122fb9f4fd423b038979e2703c2bf7d0bef2b7d7638a436e2c74da4d"
+  },
+  "telegram-ops/app/relay_models.py": {
+    "lines": 90,
+    "sha256": "ad7a447f703e2eb2c6e0c37534bb867460384e975303ab3f589e2d334b275b18"
+  },
+  "telegram-ops/app/auth.py": {
+    "lines": 120,
+    "sha256": "ca1c863f42cb94d9c9a16934eedaeb1745ce709f524e1d7465855f844927a499"
+  },
+  "telegram-ops/app/enums.py": {
+    "lines": 27,
+    "sha256": "70ef06f503d2c5ff3aa7c85d77b2951303ad96998992e8e6cd93d23c7ede76ee"
+  },
+  "telegram-ops/app/config.py": {
+    "lines": 39,
+    "sha256": "7704d047c0a90e8e245f9af6d43e1dc9d376d0f8628d743f2987e2f3b748d69a"
+  },
+  "telegram-ops/app/models.py": {
+    "lines": 170,
+    "sha256": "d8c8695c702449bbf81442f24707974e8e4389bb93cfc0dd8604bfcdff56c5ce"
+  },
+  "telegram-ops/app/relay_logic.py": {
+    "lines": 86,
+    "sha256": "f2f0b9e10242688766dc0f1cae58c0ec9c9641563093797e6a09bc06ad28c578"
+  },
+  "telegram-ops/app/database.py": {
+    "lines": 64,
+    "sha256": "e5959c6638043879f704b68363a3165b2858f26c8c60188a27f00343aee7bba6"
+  },
+  "telegram-ops/app/__init__.py": {
+    "lines": 1,
+    "sha256": "57150ab5bb6b16efdaa5c07465772c387fc4a2988bbf3d42dfb716a725b6e3ea"
+  },
+  "telegram-ops/app/rules.py": {
+    "lines": 216,
+    "sha256": "bb9b642a872664458191a10f4b7a7d608686ff6de2f71c9ec2fd75f6d9830b60"
+  },
+  "telegram-ops/app/schema_updates.py": {
+    "lines": 36,
+    "sha256": "c888ab45db30411eec73472417fd46ddf6587f6a4ce9a5993c8807b276623b6c"
+  },
+  "telegram-ops/app/console_api.py": {
+    "lines": 656,
+    "sha256": "fa199e2559aab6814cf357cbb074f3d3cdccd914f073541e014fcf2c82ff570f"
+  },
+  "telegram-ops/app/crypto.py": {
+    "lines": 36,
+    "sha256": "75e4e6ec4d3070bdba85b320ba0fbfea247895ea8f1f45dfb0670e1b12cfd6c8"
+  },
+  "telegram-ops/app/relay_engine.py": {
+    "lines": 555,
+    "sha256": "e020b7ae18dc8f39a58272ab66fc0002ea1bd6504e413f57ecd4f7a9c274a92e"
+  },
+  "telegram-ops/app/telegram_client.py": {
+    "lines": 38,
+    "sha256": "f9bd419d34f83e5aeb4346371c462bb0468175c852799c86ad62d28482b4fd79"
+  },
+  "telegram-ops/app/workers.py": {
+    "lines": 526,
+    "sha256": "5d11b3b30420a43802f5fc094a21160a2a3964b9c6216ff5d63e180245504bc1"
+  },
+  "telegram-ops/app/main.py": {
+    "lines": 366,
+    "sha256": "348c89a78c7f554d072fd1cffb8dbea6d63a78a6cd4e238b73602b46f31e4d2b"
+  },
+  "telegram-ops/static/console.js": {
+    "lines": 701,
+    "sha256": "703807e49e2f7333fe0f5029aacacbe17ad435c9e9c848704ce73e1faff17444"
+  },
+  "telegram-ops/static/app.css": {
+    "lines": 21,
+    "sha256": "8946c5f9568a2eb7962c390fcaab3e2d3d30fb4d0915aeecb061a8e8536595a9"
+  },
+  "telegram-ops/static/console.html": {
+    "lines": 71,
+    "sha256": "ccf7108b9475e65aafea8b0d360e3f5664bee9d6cc7af5922a57984936006048"
+  },
+  "telegram-ops/static/console.css": {
+    "lines": 1094,
+    "sha256": "6bad71116051ec5b354388134c8dbdb58a4e4c0d658b0751f4e3e39126197d8c"
+  },
+  "telegram-ops/templates/accounts.html": {
+    "lines": 52,
+    "sha256": "e877b2ee9f939f8a4b86aceda7057201979418e8aa3f45411d515473e104538e"
+  },
+  "telegram-ops/templates/base.html": {
+    "lines": 28,
+    "sha256": "3a426a8ecd374ab9e26a3d81bc2c8eacc02d3cf043e40f75857f3cc8129a4248"
+  },
+  "telegram-ops/templates/rules.html": {
+    "lines": 35,
+    "sha256": "df7cdb1be920f7f6092c0051dfa136cab0c8dd9c72d3165c9443c6ff8b950732"
+  },
+  "telegram-ops/templates/leads.html": {
+    "lines": 12,
+    "sha256": "5387752992c1403aadb0066b00baef221c979d3811a8fbda168cf056a6ee1ab9"
+  },
+  "telegram-ops/templates/queue.html": {
+    "lines": 12,
+    "sha256": "69da6c7d7585094c2b71c5fe810bf0fa6a1bf70e2d2c7c9bc253c3580c342da3"
+  },
+  "telegram-ops/templates/login.html": {
+    "lines": 11,
+    "sha256": "d502a5db1162b2d31c3f9e6d0ba583820715a58cb36303d769308e118271d2c6"
+  },
+  "telegram-ops/templates/dashboard.html": {
+    "lines": 19,
+    "sha256": "cecccdbf1a146cd65d49410711e1d741104b49653621f5fdcb95f3643e7ca80f"
+  },
+  "telegram-ops/templates/logs.html": {
+    "lines": 12,
+    "sha256": "f4631e4458e206e0b7032c13c2a7bf125e2cf69d59e4b7c035b3422518d8d66f"
+  },
+  "telegram-ops/templates/chats.html": {
+    "lines": 16,
+    "sha256": "2d332e1851113c4cbafa6a99515ab43db0127be93c6a3b29f339292e84ca9217"
+  },
+  "telegram-ops/templates/guards.html": {
+    "lines": 24,
+    "sha256": "f98f076c6be6c3ea8cc226b9e630bcffb9bcffd4e2aad2897a52f29db176e463"
+  },
+  "telegram-ops/templates/admin_login.html": {
+    "lines": 1,
+    "sha256": "4cd20560801008539807361f01d358aa5a0b3ceb284cbee7a438a09b2cad5c5f"
+  },
+  "telegram-ops/scripts/hash_password.py": {
+    "lines": 29,
+    "sha256": "0ec92956fa8a0b86135f40fa0c63c1ff48b1b2a2e2a7fdfb982b031aaa21c119"
+  },
+  "telegram-ops/scripts/setup_console.py": {
+    "lines": 30,
+    "sha256": "d759748953941328d19ced731487888ff7180f82d3ffe50b54e6670997729b2c"
+  },
+  "telegram-ops/scripts/seed_demo.py": {
+    "lines": 72,
+    "sha256": "cb26426ea93195a02891e864ef1d3384ea164f9b44ce6d65f7241ca7de018a5f"
+  },
+  "telegram-ops/migrations/script.py.mako": {
+    "lines": 22,
+    "sha256": "114d2c8daf1106848ce42d0c5f13a4d0056ec4205dfc568999d988c131bb8c54"
+  },
+  "telegram-ops/migrations/env.py": {
+    "lines": 45,
+    "sha256": "a4981a33c781a21122d51d472a0b16985e60b38cd34c840015565f4dac4d743e"
+  },
+  "telegram-ops/migrations/versions/0001_initial.py": {
+    "lines": 23,
+    "sha256": "c4c9ab535869e2bfadcd1ec29f72b105a8f14a6fd2862925e01b9df32cb5b0fc"
+  },
+  "telegram-ops/tests/test_forms.py": {
+    "lines": 8,
+    "sha256": "89a2d0fb0a3d15c211916e14494f6d5b36c79eab9ba8f5f07bf268d89bf3aeb7"
+  },
+  "telegram-ops/tests/test_relay.py": {
+    "lines": 515,
+    "sha256": "fde0dbc9a66c5206438e19d0fe98513eb5ca24bef86faf48b17297c9855501ec"
+  },
+  "telegram-ops/tests/conftest.py": {
+    "lines": 24,
+    "sha256": "6041eccf4649090471b0d3296b08d4afe44d81bb552734cdd508233e471809c0"
+  },
+  "telegram-ops/tests/test_auth.py": {
+    "lines": 23,
+    "sha256": "63fcb03387df39125b6e4896cb53bbb9b0592d3d9af65d13c06236ac124c977c"
+  },
+  "telegram-ops/tests/test_login.py": {
+    "lines": 134,
+    "sha256": "ede5108948a2be76852c05fdf00e652a9759ace6825bbd3e6c928e9ef05a1899"
+  },
+  "telegram-ops/tests/test_schema_updates.py": {
+    "lines": 24,
+    "sha256": "23b257144ac6c989b215451b9a39000554fd18ebd81162e065935cca4c429306"
+  },
+  "telegram-ops/tests/test_console_api.py": {
+    "lines": 582,
+    "sha256": "a554be3c303b980f120bbe51ba5f199c599dc5c13096daaf31090de43d4692aa"
+  },
+  "telegram-ops/tests/test_rules.py": {
+    "lines": 37,
+    "sha256": "50863c0675d1cbb89bc5ace4f2fa428e36c3c8ac96728dd2af2744622c9bbbc6"
+  }
+}

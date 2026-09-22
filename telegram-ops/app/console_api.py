@@ -24,6 +24,9 @@ from app.telegram_client import make_client
 
 router = APIRouter()
 
+DM_TEMPLATE_MAX_LENGTH = 3500
+RECORDS_PAGE_SIZE = 50
+
 
 def required(db, cls, id):
     item = db.get(cls, id)
@@ -32,17 +35,25 @@ def required(db, cls, id):
     return item
 
 
-def account_json(a, db):
+def account_json(a: Account, db: Session) -> dict:
     profile = get_profile(db, a)
-    connected = a.id in manager.workers and manager.workers[a.id].client.is_connected()
     binding = db.get(SenderBinding, a.id)
+    weight = db.get(SenderWeight, a.id)
+    return account_payload(a, profile, binding, weight)
+
+
+def account_payload(
+    a: Account,
+    profile: AccountProfile,
+    binding: SenderBinding | None,
+    weight: SenderWeight | None,
+) -> dict:
+    connected = a.id in manager.workers and manager.workers[a.id].client.is_connected()
     return dict(
         receive_chat_ids=json.loads(binding.chat_ids) if binding else [],
         dm_template=binding.template if binding else "",
         role=profile.role,
-        rotation_weight=(
-            db.get(SenderWeight, a.id).weight if db.get(SenderWeight, a.id) else 1
-        ),
+        rotation_weight=weight.weight if weight else 1,
         monitor_chat_ids=json.loads(profile.monitor_chat_ids),
         id=a.id,
         name=a.name,
@@ -55,6 +66,19 @@ def account_json(a, db):
         last_error=a.last_error,
         flood_wait_until=a.flood_wait_until,
     )
+
+
+def accounts_json(accounts: list[Account], db: Session) -> list[dict]:
+    if not accounts:
+        return []
+    profiles = {p.account_id: p for p in db.query(AccountProfile).all()}
+    if any(a.id not in profiles for a in accounts):
+        # Preserve get_profile's legacy migration timing and side effects.
+        return [account_json(a, db) for a in accounts]
+    bindings = {b.account_id: b for b in db.query(SenderBinding).all()}
+    weights = {w.account_id: w for w in db.query(SenderWeight).all()}
+    return [account_payload(a, profiles[a.id], bindings.get(a.id), weights.get(a.id))
+            for a in accounts]
 
 
 def task_json(t):
@@ -131,7 +155,7 @@ GroupID = Annotated[int, Field(strict=True, ge=-(2**52), lt=0)]
 
 class ReceiveGroupsInput(BaseModel):
     chat_ids: list[GroupID] = Field(max_length=200)
-    template: str = Field(default="", max_length=3500)
+    template: str = Field(default="", max_length=DM_TEMPLATE_MAX_LENGTH)
 
     @field_validator("chat_ids")
     @classmethod
@@ -232,12 +256,12 @@ class TaskInput(BaseModel):
         None  # Legacy API compatibility; not required for monitoring.
     )
     source_chats: list[GroupID] = Field(min_length=1, max_length=200)
-    relay_chat: GroupID
+    relay_chat: GroupID | None = None
     keywords: str = Field(min_length=1, max_length=4000)
     exclude_keywords: str = Field(default="", max_length=4000)
     ignore_users: str = Field(default="", max_length=4000)
     match_mode: str = Field(default="any", pattern="^(any|all|exact)$")
-    template: str = Field(default="", max_length=3500)
+    template: str = Field(default="", max_length=DM_TEMPLATE_MAX_LENGTH)
 
     @field_validator("keywords", "name")
     @classmethod
@@ -280,12 +304,13 @@ def state(db: Session = Depends(get_db)):
     accounts = db.query(Account).order_by(Account.id).all()
     tasks = db.query(RelayTask).order_by(RelayTask.id.desc()).all()
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    application = application_settings(db)
     return dict(
         running=manager.running,
-        accounts=[account_json(a, db) for a in accounts],
+        accounts=accounts_json(accounts, db),
         application={
-            "configured": bool(application_settings(db)),
-            "api_id": (application_settings(db) or {}).get("api_id"),
+            "configured": bool(application),
+            "api_id": (application or {}).get("api_id"),
         },
         tasks=[task_json(t) for t in tasks],
         chats=[
@@ -345,7 +370,7 @@ def add_account(data: AccountInput, db: Session = Depends(get_db)):
 
 
 @router.post("/api/accounts/{id}/permissions")
-def permissions(id: int, data: PermissionsInput, db: Session = Depends(get_db)):
+async def permissions(id: int, data: PermissionsInput, db: Session = Depends(get_db)):
     a = required(db, Account, id)
     a.send_enabled, a.private_message_enabled = (
         data.send_enabled,
@@ -360,7 +385,7 @@ async def send_code(id: int, db: Session = Depends(get_db)):
     a = required(db, Account, id)
     if a.session_string_encrypted:
         raise HTTPException(409, "账号已有登录会话，请先退出账号再重新登录")
-    async with manager.account_locks.setdefault(id, __import__("asyncio").Lock()):
+    async with manager.account_lock(id):
         try:
             await send_login_code(id)
         except Exception as exc:
@@ -375,9 +400,18 @@ def login_error(exc):
         "PhoneCodeExpiredError": "验证码已过期，请重新获取",
         "PasswordHashInvalidError": "两步验证密码不正确",
         "ApiIdInvalidError": "API ID 或 API Hash 不正确",
+        "ApiIdPublishedFloodError": "Telegram 限制了这组公开 API 凭据，请改用自有应用凭据",
         "PhoneNumberInvalidError": "手机号格式不正确",
         "FloodWaitError": "Telegram 要求等待，请稍后再试",
-        "ValueError": "需要两步验证密码，或账号尚未完成登录",
+        "TwoStepPasswordRequired": "需要两步验证密码，请填写后再次登录",
+        "SessionPasswordNeededError": "需要两步验证密码，请填写后再次登录",
+        "PhoneMigrateError": "Telegram 数据中心切换未完成，请稍后重新请求验证码",
+        "NetworkMigrateError": "Telegram 数据中心切换未完成，请稍后重新请求验证码",
+        "UserMigrateError": "Telegram 数据中心切换未完成，请稍后重新登录",
+        "ValueError": "登录请求未完成，请检查登录配置或稍后重试",
+        "ServerError": "Telegram 服务暂时异常，请稍后重试",
+        "RpcCallFailError": "Telegram 服务暂时异常，请稍后重试",
+        "TimeoutError": "连接 Telegram 超时，请检查网络后重试",
     }.get(type(exc).__name__, "操作失败：" + type(exc).__name__)
 
 
@@ -386,7 +420,7 @@ async def verify(id: int, data: VerifyInput, db: Session = Depends(get_db)):
     a = required(db, Account, id)
     if not a.phone_code_hash:
         raise HTTPException(400, "请先请求验证码")
-    async with manager.account_locks.setdefault(id, __import__("asyncio").Lock()):
+    async with manager.account_lock(id):
         try:
             await verify_login_code(id, data.code, data.password or None)
         except Exception as exc:
@@ -399,7 +433,7 @@ async def sync(id: int, db: Session = Depends(get_db)):
     a = required(db, Account, id)
     if not a.session_string_encrypted:
         raise HTTPException(400, "请先完成账号登录")
-    async with manager.lock:
+    async with manager.account_lock(id):
         await manager.disconnect_account(id)
         try:
             count = await sync_account_chats(id)
@@ -467,9 +501,11 @@ async def edit_task(id: int, data: TaskInput, db: Session = Depends(get_db)):
 
 
 @router.post("/api/tasks/{id}/toggle")
-def toggle_task(id: int, db: Session = Depends(get_db)):
+async def toggle_task(id: int, db: Session = Depends(get_db)):
     t = required(db, RelayTask, id)
     if not t.enabled:
+        if t.relay_chat is None:
+            raise HTTPException(422, "请先填写转发目标群组 ID，再启用绑定")
         if not json.loads(t.source_chats):
             raise HTTPException(422, "请先绑定至少一个监测群组 ID")
         validate_task(
@@ -500,7 +536,7 @@ class PreviewInput(BaseModel):
     exclude_keywords: str = Field(default="", max_length=4000)
     ignore_users: str = Field(default="", max_length=4000)
     match_mode: str = Field(default="any", pattern="^(any|all|exact)$")
-    template: str = Field(default="", max_length=3500)
+    template: str = Field(default="", max_length=DM_TEMPLATE_MAX_LENGTH)
 
 
 @router.post("/api/preview")
@@ -536,7 +572,7 @@ def records(
     if q:
         query = query.filter(RelayJob.username.contains(q.lstrip("@"), autoescape=True))
     total = query.count()
-    rows = query.order_by(RelayJob.id.desc()).offset(max(0, offset)).limit(50).all()
+    rows = query.order_by(RelayJob.id.desc()).offset(max(0, offset)).limit(RECORDS_PAGE_SIZE).all()
     return {
         "total": total,
         "items": [
@@ -566,7 +602,7 @@ def records(
 
 
 @router.post("/api/records/{id}/cancel")
-def cancel(id: int, db: Session = Depends(get_db)):
+async def cancel(id: int, db: Session = Depends(get_db)):
     j = required(db, RelayJob, id)
     if j.status not in ("pending", "waiting"):
         raise HTTPException(409, "只能取消尚未发送的任务")
@@ -606,7 +642,7 @@ def guards(db: Session = Depends(get_db)):
 
 
 @router.post("/api/guards")
-def add_guard(data: GuardInput, db: Session = Depends(get_db)):
+async def add_guard(data: GuardInput, db: Session = Depends(get_db)):
     g = db.query(UserGuard).filter(UserGuard.telegram_user_id == data.user_id).first()
     if not g:
         g = UserGuard(telegram_user_id=data.user_id)
@@ -618,7 +654,7 @@ def add_guard(data: GuardInput, db: Session = Depends(get_db)):
 
 
 @router.delete("/api/guards/{id}")
-def remove_guard(id: int, db: Session = Depends(get_db)):
+async def remove_guard(id: int, db: Session = Depends(get_db)):
     g = required(db, UserGuard, id)
     db.delete(g)
     db.commit()

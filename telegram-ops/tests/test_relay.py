@@ -471,3 +471,45 @@ def test_route_changed_during_sender_lookup_drops_stale_event():
     asyncio.run(e.on_message(1, ev))
     with session_scope() as db:
         assert db.query(RelayJob).count() == 0
+
+
+def test_missing_target_never_enqueues_or_sends():
+    t = seed()
+    e = engine()
+    # Even malformed legacy state (enabled without a destination) cannot send.
+    with session_scope() as db:
+        db.get(RelayTask, t.id).relay_chat = None
+    t.relay_chat = None
+    asyncio.run(e.on_message(1, event(-1001, User(id=999, username='target_user'), '咨询')))
+    e.enqueue(t, 'relay', 1, -1001, 10, 999, 'target_user', '群', '咨询', '群-咨询-@target_user')
+    with session_scope() as db:
+        assert db.query(RelayJob).count() == 0
+        job = RelayJob(task_id=t.id, stage='relay', account_id=1, chat_id=-1001,
+                       message_id=11, user_id=999, username='target_user',
+                       original_text='咨询', text='群-咨询-@target_user', status='pending')
+        db.add(job)
+        db.flush()
+        job_id = job.id
+    asyncio.run(e.send_job(job_id))
+    e.workers[1].client.send_message.assert_not_awaited()
+    with session_scope() as db:
+        assert db.get(RelayJob, job_id).status == 'cancelled'
+
+
+@pytest.mark.parametrize('separator', [' ', '   ', '\t', '\n', '\u3000', ',', '，'])
+def test_keyword_separators_and_modes(separator):
+    t = seed()
+    t.keywords = separator.join(['携程', '卡密', '大润发', '盒马'])
+    for word in ['携程', '卡密', '大润发', '盒马']:
+        assert filter_message(t, '咨询' + word, 'target_user')[0]
+    assert not filter_message(t, '无关消息', 'target_user')[0]
+    t.match_mode = 'all'
+    assert not filter_message(t, '携程', 'target_user')[0]
+    assert filter_message(t, '携程卡密大润发盒马', 'target_user')[0]
+    t.match_mode = 'exact'
+    assert filter_message(t, '盒马', 'target_user')[0]
+    assert not filter_message(t, '咨询盒马', 'target_user')[0]
+    t.match_mode = 'any'
+    t.exclude_keywords = separator.join(['广告', '推广'])
+    assert not filter_message(t, '盒马推广', 'target_user')[0]
+    assert not filter_message(t, '携程广告', 'target_user')[0]

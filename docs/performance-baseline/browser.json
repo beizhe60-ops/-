@@ -1,0 +1,984 @@
+{
+  "browser": "153.0.8010.53",
+  "pages": [
+    {
+      "mobile": false,
+      "route": "overview",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/overview",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 42.699999928474426,
+        "navigationId": 7255,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.3999999761581421,
+        "domainLookupStart": 0.3999999761581421,
+        "domainLookupEnd": 0.3999999761581421,
+        "connectStart": 0.3999999761581421,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.3999999761581421,
+        "requestStart": 1.399999976158142,
+        "responseStart": 4.5,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 4.5,
+        "responseEnd": 5.699999928474426,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 0,
+        "unloadEventEnd": 0,
+        "domInteractive": 14.399999976158142,
+        "domContentLoadedEventStart": 42.60000002384186,
+        "domContentLoadedEventEnd": 42.60000002384186,
+        "domComplete": 42.699999928474426,
+        "loadEventStart": 42.699999928474426,
+        "loadEventEnd": 42.699999928474426,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "low"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 16.299999952316284
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0.002863387104552469,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 2221094,
+      "overflow": false
+    },
+    {
+      "mobile": false,
+      "route": "accounts",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/accounts",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 7.099999904632568,
+        "navigationId": 5912,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.19999992847442627,
+        "domainLookupStart": 0.19999992847442627,
+        "domainLookupEnd": 0.19999992847442627,
+        "connectStart": 0.19999992847442627,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.19999992847442627,
+        "requestStart": 0.3999999761581421,
+        "responseStart": 1.6999999284744263,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 1.6999999284744263,
+        "responseEnd": 1.899999976158142,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 3.899999976158142,
+        "unloadEventEnd": 3.899999976158142,
+        "domInteractive": 6.099999904632568,
+        "domContentLoadedEventStart": 6.799999952316284,
+        "domContentLoadedEventEnd": 6.799999952316284,
+        "domComplete": 7.099999904632568,
+        "loadEventStart": 7.099999904632568,
+        "loadEventEnd": 7.099999904632568,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "low"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 8.299999952316284
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0.00010046296296296296,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 3507774,
+      "overflow": false
+    },
+    {
+      "mobile": false,
+      "route": "tasks",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/tasks",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 10.200000047683716,
+        "navigationId": 5764,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.30000007152557373,
+        "domainLookupStart": 0.30000007152557373,
+        "domainLookupEnd": 0.30000007152557373,
+        "connectStart": 0.30000007152557373,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.30000007152557373,
+        "requestStart": 0.5,
+        "responseStart": 2.3000000715255737,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 2.3000000715255737,
+        "responseEnd": 2.5,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 7.300000071525574,
+        "unloadEventEnd": 7.300000071525574,
+        "domInteractive": 9.5,
+        "domContentLoadedEventStart": 9.800000071525574,
+        "domContentLoadedEventEnd": 9.800000071525574,
+        "domComplete": 10.100000023841858,
+        "loadEventStart": 10.200000047683716,
+        "loadEventEnd": 10.200000047683716,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "low"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 12.700000047683716
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0.00010046296296296296,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 4254554,
+      "overflow": false
+    },
+    {
+      "mobile": false,
+      "route": "records",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/records",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 8.700000047683716,
+        "navigationId": 8461,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.5,
+        "domainLookupStart": 0.5,
+        "domainLookupEnd": 0.5,
+        "connectStart": 0.5,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.5,
+        "requestStart": 1.100000023841858,
+        "responseStart": 3.700000047683716,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 3.700000047683716,
+        "responseEnd": 4.300000071525574,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 5.700000047683716,
+        "unloadEventEnd": 5.700000047683716,
+        "domInteractive": 8.100000023841858,
+        "domContentLoadedEventStart": 8.5,
+        "domContentLoadedEventEnd": 8.5,
+        "domComplete": 8.700000047683716,
+        "loadEventStart": 8.700000047683716,
+        "loadEventEnd": 8.700000047683716,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "low"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 9.300000071525574
+        },
+        {
+          "path": "/api/records",
+          "duration": 6.300000071525574
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0.043755555555555554,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 5281192,
+      "overflow": false
+    },
+    {
+      "mobile": false,
+      "route": "guards",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/guards",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 13,
+        "navigationId": 3725,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.3999999761581421,
+        "domainLookupStart": 0.3999999761581421,
+        "domainLookupEnd": 0.3999999761581421,
+        "connectStart": 0.3999999761581421,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.3999999761581421,
+        "requestStart": 0.6000000238418579,
+        "responseStart": 2.100000023841858,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 2.100000023841858,
+        "responseEnd": 2.399999976158142,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 9.600000023841858,
+        "unloadEventEnd": 9.600000023841858,
+        "domInteractive": 12.100000023841858,
+        "domContentLoadedEventStart": 12.5,
+        "domContentLoadedEventEnd": 12.600000023841858,
+        "domComplete": 13,
+        "loadEventStart": 13,
+        "loadEventEnd": 13,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "high"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 6.799999952316284
+        },
+        {
+          "path": "/api/guards",
+          "duration": 3
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0.00010046296296296296,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 6511574,
+      "overflow": false
+    },
+    {
+      "mobile": false,
+      "route": "settings",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/settings",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 7.399999976158142,
+        "navigationId": 6835,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.2999999523162842,
+        "domainLookupStart": 0.2999999523162842,
+        "domainLookupEnd": 0.2999999523162842,
+        "connectStart": 0.2999999523162842,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.2999999523162842,
+        "requestStart": 0.6999999284744263,
+        "responseStart": 2.299999952316284,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 2.299999952316284,
+        "responseEnd": 2.6999999284744263,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 4.399999976158142,
+        "unloadEventEnd": 4.399999976158142,
+        "domInteractive": 7,
+        "domContentLoadedEventStart": 7.399999976158142,
+        "domContentLoadedEventEnd": 7.399999976158142,
+        "domComplete": 7.399999976158142,
+        "loadEventStart": 7.399999976158142,
+        "loadEventEnd": 7.399999976158142,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "high"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 7.600000023841858
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0.013212601514274691,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 7756200,
+      "overflow": false
+    },
+    {
+      "mobile": true,
+      "route": "overview",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/overview",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 29.5,
+        "navigationId": 6291,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.3999999761581421,
+        "domainLookupStart": 0.3999999761581421,
+        "domainLookupEnd": 0.3999999761581421,
+        "connectStart": 0.3999999761581421,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.3999999761581421,
+        "requestStart": 1,
+        "responseStart": 3.5,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 3.5,
+        "responseEnd": 4.099999904632568,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 0,
+        "unloadEventEnd": 0,
+        "domInteractive": 10.599999904632568,
+        "domContentLoadedEventStart": 29.399999976158142,
+        "domContentLoadedEventEnd": 29.399999976158142,
+        "domComplete": 29.5,
+        "loadEventStart": 29.5,
+        "loadEventEnd": 29.5,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "high"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 11.5
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 2272916,
+      "overflow": false
+    },
+    {
+      "mobile": true,
+      "route": "accounts",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/accounts",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 8.5,
+        "navigationId": 2721,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.2999999523162842,
+        "domainLookupStart": 0.2999999523162842,
+        "domainLookupEnd": 0.2999999523162842,
+        "connectStart": 0.2999999523162842,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.2999999523162842,
+        "requestStart": 0.8999999761581421,
+        "responseStart": 3.399999976158142,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 3.399999976158142,
+        "responseEnd": 4.099999904632568,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 5.699999928474426,
+        "unloadEventEnd": 5.699999928474426,
+        "domInteractive": 7.699999928474426,
+        "domContentLoadedEventStart": 8.199999928474426,
+        "domContentLoadedEventEnd": 8.199999928474426,
+        "domComplete": 8.5,
+        "loadEventStart": 8.5,
+        "loadEventEnd": 8.5,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "high"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 11.299999952316284
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 3570252,
+      "overflow": false
+    },
+    {
+      "mobile": true,
+      "route": "tasks",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/tasks",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 6.899999976158142,
+        "navigationId": 3644,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.3999999761581421,
+        "domainLookupStart": 0.3999999761581421,
+        "domainLookupEnd": 0.3999999761581421,
+        "connectStart": 0.3999999761581421,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.3999999761581421,
+        "requestStart": 0.7999999523162842,
+        "responseStart": 2.5999999046325684,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 2.5999999046325684,
+        "responseEnd": 3,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 4.199999928474426,
+        "unloadEventEnd": 4.199999928474426,
+        "domInteractive": 6.299999952316284,
+        "domContentLoadedEventStart": 6.599999904632568,
+        "domContentLoadedEventEnd": 6.599999904632568,
+        "domComplete": 6.899999976158142,
+        "loadEventStart": 6.899999976158142,
+        "loadEventEnd": 6.899999976158142,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "high"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 8.100000023841858
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 4315692,
+      "overflow": false
+    },
+    {
+      "mobile": true,
+      "route": "records",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/records",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 6.800000071525574,
+        "navigationId": 8158,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.20000004768371582,
+        "domainLookupStart": 0.20000004768371582,
+        "domainLookupEnd": 0.20000004768371582,
+        "connectStart": 0.20000004768371582,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.20000004768371582,
+        "requestStart": 0.6000000238418579,
+        "responseStart": 2.3000000715255737,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 2.3000000715255737,
+        "responseEnd": 2.8000000715255737,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 4,
+        "unloadEventEnd": 4,
+        "domInteractive": 6.200000047683716,
+        "domContentLoadedEventStart": 6.600000023841858,
+        "domContentLoadedEventEnd": 6.600000023841858,
+        "domComplete": 6.800000071525574,
+        "loadEventStart": 6.800000071525574,
+        "loadEventEnd": 6.800000071525574,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "low"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 7.100000023841858
+        },
+        {
+          "path": "/api/records",
+          "duration": 4.100000023841858
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 5400271,
+      "overflow": false
+    },
+    {
+      "mobile": true,
+      "route": "guards",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/guards",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 9.199999928474426,
+        "navigationId": 5245,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.19999992847442627,
+        "domainLookupStart": 0.19999992847442627,
+        "domainLookupEnd": 0.19999992847442627,
+        "connectStart": 0.19999992847442627,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.19999992847442627,
+        "requestStart": 0.6000000238418579,
+        "responseStart": 2.600000023841858,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 2.600000023841858,
+        "responseEnd": 3.100000023841858,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 6.199999928474426,
+        "unloadEventEnd": 6.199999928474426,
+        "domInteractive": 8.899999976158142,
+        "domContentLoadedEventStart": 9.199999928474426,
+        "domContentLoadedEventEnd": 9.199999928474426,
+        "domComplete": 9.199999928474426,
+        "loadEventStart": 9.199999928474426,
+        "loadEventEnd": 9.199999928474426,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "low"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 8.5
+        },
+        {
+          "path": "/api/guards",
+          "duration": 2.600000023841858
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 6660297,
+      "overflow": false
+    },
+    {
+      "mobile": true,
+      "route": "settings",
+      "nav": {
+        "name": "http://127.0.0.1:18766/console/settings",
+        "entryType": "navigation",
+        "startTime": 0,
+        "duration": 6.5,
+        "navigationId": 2667,
+        "initiatorType": "navigation",
+        "deliveryType": "",
+        "nextHopProtocol": "http/1.1",
+        "renderBlockingStatus": "non-blocking",
+        "contentType": "text/html",
+        "contentEncoding": "",
+        "workerStart": 0,
+        "workerRouterEvaluationStart": 0,
+        "workerCacheLookupStart": 0,
+        "workerMatchedSourceType": "",
+        "workerFinalSourceType": "",
+        "redirectStart": 0,
+        "redirectEnd": 0,
+        "fetchStart": 0.30000007152557373,
+        "domainLookupStart": 0.30000007152557373,
+        "domainLookupEnd": 0.30000007152557373,
+        "connectStart": 0.30000007152557373,
+        "secureConnectionStart": 0,
+        "connectEnd": 0.30000007152557373,
+        "requestStart": 0.7000000476837158,
+        "responseStart": 2.3000000715255737,
+        "firstInterimResponseStart": 0,
+        "finalResponseHeadersStart": 2.3000000715255737,
+        "responseEnd": 2.8000000715255737,
+        "transferSize": 2954,
+        "encodedBodySize": 2654,
+        "decodedBodySize": 2654,
+        "responseStatus": 200,
+        "serverTiming": [],
+        "unloadEventStart": 3.8000000715255737,
+        "unloadEventEnd": 3.8000000715255737,
+        "domInteractive": 5.800000071525574,
+        "domContentLoadedEventStart": 6.200000047683716,
+        "domContentLoadedEventEnd": 6.200000047683716,
+        "domComplete": 6.5,
+        "loadEventStart": 6.5,
+        "loadEventEnd": 6.5,
+        "type": "navigate",
+        "redirectCount": 0,
+        "activationStart": 0,
+        "criticalCHRestart": 0,
+        "notRestoredReasons": null,
+        "confidence": {
+          "randomizedTriggerRate": 0.4994798,
+          "value": "high"
+        }
+      },
+      "api": [
+        {
+          "path": "/api/state",
+          "duration": 8
+        }
+      ],
+      "audit": {
+        "longTasks": [],
+        "cls": 0,
+        "contentMutations": 1,
+        "intervals": 1
+      },
+      "heap": 7924355,
+      "overflow": false
+    }
+  ],
+  "interactions": [
+    {
+      "mobile": false,
+      "name": "open_binding",
+      "ms": 75
+    },
+    {
+      "mobile": false,
+      "name": "save_binding",
+      "ms": 57
+    },
+    {
+      "mobile": false,
+      "name": "sender_tab",
+      "ms": 24
+    },
+    {
+      "mobile": false,
+      "name": "edit_copy",
+      "ms": 34
+    },
+    {
+      "mobile": false,
+      "name": "save_copy",
+      "ms": 51
+    },
+    {
+      "mobile": false,
+      "name": "next_page",
+      "ms": 51
+    },
+    {
+      "mobile": false,
+      "name": "search",
+      "ms": 38
+    },
+    {
+      "mobile": true,
+      "name": "open_binding",
+      "ms": 38
+    },
+    {
+      "mobile": true,
+      "name": "save_binding",
+      "ms": 52
+    },
+    {
+      "mobile": true,
+      "name": "sender_tab",
+      "ms": 37
+    },
+    {
+      "mobile": true,
+      "name": "edit_copy",
+      "ms": 36
+    },
+    {
+      "mobile": true,
+      "name": "save_copy",
+      "ms": 50
+    },
+    {
+      "mobile": true,
+      "name": "next_page",
+      "ms": 51
+    },
+    {
+      "mobile": true,
+      "name": "search",
+      "ms": 39
+    }
+  ],
+  "errors": [],
+  "modalPoll": {
+    "requests": 0,
+    "draft": "咨询 服务 测试"
+  },
+  "poll31s": {
+    "before": {
+      "documents": 1,
+      "nodes": 254,
+      "jsEventListeners": 19
+    },
+    "after": {
+      "documents": 1,
+      "nodes": 254,
+      "jsEventListeners": 19
+    },
+    "heap0": 1655521,
+    "heap1": 1656945,
+    "audit": {
+      "longTasks": [],
+      "cls": 0.002863387104552469,
+      "contentMutations": 3,
+      "intervals": 1
+    },
+    "api": 3
+  },
+  "modalCycles": {
+    "cycles": 40,
+    "before": {
+      "documents": 1,
+      "nodes": 191,
+      "jsEventListeners": 25
+    },
+    "after": {
+      "documents": 1,
+      "nodes": 351,
+      "jsEventListeners": 27
+    }
+  }
+}

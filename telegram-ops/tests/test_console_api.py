@@ -545,3 +545,38 @@ def test_binding_migration_only_explicit_legacy_receiver_and_no_resurrection():
         db.flush()
         migrate_profiles(db)
         assert db.get(SenderBinding, 2).chat_ids == "[]"
+
+
+def test_optional_target_saved_but_cannot_enable_until_configured():
+    with TestClient(app) as c:
+        login(c)
+        seed()
+        payload = dict(name="待配置绑定", account_a=1, source_chats=[-1001], keywords="咨询")
+        response = c.post('/api/tasks', json=payload, headers=HEAD)
+        assert response.status_code == 200
+        task = response.json()
+        assert task['relay_chat'] is None and not task['enabled']
+        task_url = f"/api/tasks/{task['id']}"
+        assert c.get('/api/state').json()['tasks'][0]['relay_chat'] is None
+        response = c.post(task_url + '/toggle', headers=HEAD)
+        assert response.status_code == 422
+        assert '转发目标群组 ID' in response.json()['detail']
+        payload['relay_chat'] = -1002
+        assert c.put(task_url, json=payload, headers=HEAD).status_code == 200
+        assert c.post(task_url + '/toggle', headers=HEAD).json()['enabled']
+        payload['relay_chat'] = None
+        response = c.put(task_url, json=payload, headers=HEAD)
+        assert response.status_code == 200
+        assert response.json()['relay_chat'] is None and not response.json()['enabled']
+
+
+def test_preview_space_separated_keywords():
+    with TestClient(app) as c:
+        login(c)
+        payload = dict(text='咨询盒马', username='target_user', keywords='携程 卡密 大润发 盒马')
+        response = c.post('/api/preview', headers=HEAD, json=payload)
+        assert response.status_code == 200
+        assert '命中：盒马' in response.text
+        payload['exclude_keywords'] = '咨询 广告'
+        response = c.post('/api/preview', headers=HEAD, json=payload)
+        assert '命中排除词：咨询' in response.text

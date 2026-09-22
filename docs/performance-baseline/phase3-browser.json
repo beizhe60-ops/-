@@ -1,0 +1,22 @@
+[
+  {
+    "mobile": false,
+    "slowPollRequests": 1,
+    "postMutationFreshRead": true,
+    "recordRefreshRequests": 1,
+    "staleRenderDiscarded": true,
+    "readTimeoutRecovered": true,
+    "remainingReadTimers": 0,
+    "pageErrors": []
+  },
+  {
+    "mobile": true,
+    "slowPollRequests": 1,
+    "postMutationFreshRead": true,
+    "recordRefreshRequests": 1,
+    "staleRenderDiscarded": true,
+    "readTimeoutRecovered": true,
+    "remainingReadTimers": 0,
+    "pageErrors": []
+  }
+]

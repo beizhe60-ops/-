@@ -16,6 +16,14 @@ let state = null,
   recordStatus = "",
   recordSearch = "";
 let accountTab = "monitor";
+let renderedOverview = null;
+let recordsPending = false;
+let servicePending = false;
+let stateRequest = null;
+let stateRevision = 0;
+let renderRevision = 0;
+let pollFailed = false;
+const READ_TIMEOUT_MS = 30000;
 const titles = {
   overview: "运行概览",
   accounts: "账号管理",
@@ -53,30 +61,60 @@ const date = (s) =>
       })
     : "—";
 async function api(path, method = "GET", body) {
-  const res = await fetch("/api" + path, {
-    method,
-    headers: { "Content-Type": "application/json", "X-Console-Request": "1" },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-  let data;
+  // Only reads may time out here. Aborting a write does not undo server work.
+  const controller = method === "GET" ? new AbortController() : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), READ_TIMEOUT_MS) : null;
   try {
-    data = await res.json();
-  } catch {
-    throw Error("服务器未返回有效结果，请检查服务状态");
+    const res = await fetch("/api" + path, {
+      method,
+      headers: { "Content-Type": "application/json", "X-Console-Request": "1" },
+      ...(controller ? { signal: controller.signal } : {}),
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    if (res.status === 401) {
+      location.href = "/admin/login?next=" + encodeURIComponent(location.pathname);
+      throw Error("请重新登录");
+    }
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      if (controller?.signal.aborted) throw e;
+      throw Error("服务器未返回有效结果，请检查服务状态");
+    }
+    if (!res.ok)
+      throw Error(typeof data.detail === "string"
+        ? data.detail : JSON.stringify(data.detail || "请求失败"));
+    return data;
+  } catch (e) {
+    if (controller?.signal.aborted) throw Error("读取超时，请重试；当前页面内容已保留");
+    throw e;
+  } finally {
+    if (timeout !== null) clearTimeout(timeout);
   }
-  if (res.status === 401) {
-    location.href =
-      "/admin/login?next=" + encodeURIComponent(location.pathname);
-    throw Error("请重新登录");
-  }
-  if (!res.ok)
-    throw Error(
-      typeof data.detail === "string"
-        ? data.detail
-        : JSON.stringify(data.detail || "请求失败"),
-    );
-  return data;
 }
+
+async function readState({ fresh = false } = {}) {
+  if (fresh) {
+    // A post-save read must not reuse a response requested before that save.
+    stateRevision++;
+    if (stateRequest) await stateRequest.catch(() => {});
+  }
+  if (stateRequest) return stateRequest;
+  const revision = stateRevision;
+  const request = api("/state").then((next) => {
+    if (revision !== stateRevision) return false;
+    state = next;
+    serviceHeader();
+    pollFailed = false;
+    return true;
+  }).finally(() => {
+    if (stateRequest === request) stateRequest = null;
+  });
+  stateRequest = request;
+  return request;
+}
+
 let toastTimer;
 function toast(text) {
   $("#toast").textContent = text;
@@ -133,26 +171,30 @@ function serviceHeader() {
   b.textContent = state.running ? "● 服务运行中" : "○ 服务已暂停";
   btn.textContent = state.running ? "暂停全部" : "启动服务";
   btn.className = "button " + (state.running ? "danger" : "secondary");
-  btn.disabled = false;
+  btn.disabled = servicePending;
 }
 async function load() {
-  state = await api("/state");
-  serviceHeader();
-  await render();
+  const revision = ++renderRevision;
+  if (await readState({ fresh: true })) await render({ revision });
 }
 $("#service-button").onclick = async () => {
   const b = $("#service-button");
+  if (servicePending) return;
+  servicePending = true;
+  const wasRunning = state.running;
   b.disabled = true;
   try {
-    await api("/service/" + (state.running ? "stop" : "start"), "POST");
+    await api("/service/" + (wasRunning ? "stop" : "start"), "POST");
     toast(
-      state.running
+      wasRunning
         ? "服务已暂停；进行中的发送可能已经交付，请查看记录"
         : "服务已启动，账号连接状态稍后更新",
     );
     await load();
   } catch (e) {
     toast(e.message);
+  } finally {
+    servicePending = false;
     b.disabled = false;
   }
 };
@@ -164,8 +206,8 @@ function tasksList() {
     ? state.tasks
         .map(
           (t) =>
-            `<div class="task-row"><div><div class="actions"><span class="task-name">${E(t.name)}</span>${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}</div><div class="task-flow">${E(accountName(t.account_a))} · ${t.source_chats.map((g) => E(g)).join("、")}　→　${E(t.relay_chat)}${chatName(t.relay_chat) !== String(t.relay_chat) ? "（" + E(chatName(t.relay_chat)) + "）" : ""} · ${state.accounts.filter((a) => a.role === "sender" && (a.receive_chat_ids || []).includes(t.relay_chat)).length} 个私信账号已绑定</div><div class="chips">${t.keywords
-              .split(/[\n,，]/)
+            `<div class="task-row"><div><div class="actions"><span class="task-name">${E(t.name)}</span>${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}</div><div class="task-flow">${E(accountName(t.account_a))} · ${t.source_chats.map((g) => E(g)).join("、")}　→　${E(t.relay_chat ?? "待配置")}${t.relay_chat != null && chatName(t.relay_chat) !== String(t.relay_chat) ? "（" + E(chatName(t.relay_chat)) + "）" : ""} · ${state.accounts.filter((a) => a.role === "sender" && (a.receive_chat_ids || []).includes(t.relay_chat)).length} 个私信账号已绑定</div><div class="chips">${t.keywords
+              .split(/[\s,，]+/)
               .filter(Boolean)
               .slice(0, 6)
               .map((w) => `<span class="chip">${E(w)}</span>`)
@@ -255,7 +297,7 @@ function accounts() {
               .filter((t) => t.account_a === a.id)
               .map(
                 (t) =>
-                  `<div class="group-binding-row"><div class="chips">${t.source_chats.map((g) => `<span class="chip">${g}</span>`).join("")}</div><p>→ <strong>${t.relay_chat}</strong></p><div class="actions">${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}<button class="secondary small" data-edit-task="${t.id}">编辑绑定</button><button class="secondary small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button></div></div>`,
+                  `<div class="group-binding-row"><div class="chips">${t.source_chats.map((g) => `<span class="chip">${g}</span>`).join("")}</div><p>→ <strong>${E(t.relay_chat ?? "待配置")}</strong></p><div class="actions">${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}<button class="secondary small" data-edit-task="${t.id}">编辑绑定</button><button class="secondary small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button></div></div>`,
               )
               .join("") || '<p class="muted">尚未绑定，不会监测转发。</p>'
           }<button class="secondary small" data-monitor-groups="${a.id}">绑定监测与转发群组</button></div>`
@@ -281,14 +323,18 @@ function tasks() {
     `<section class="panel"><div class="panel-head"><h2>全部任务</h2><span class="muted">${state.tasks.length} 条任务</span></div>${tasksList()}</section><div class="callout">转发格式固定为“群组-该用户发言的内容-@用户名”。私信账号只处理已绑定群组内、本系统监测账号发送的标准消息。编辑任务会暂停任务并取消旧的待发送内容，保存后需重新启用。</div>`
   );
 }
-async function records() {
+async function records({
+  offset = recordOffset,
+  status = recordStatus,
+  search = recordSearch,
+} = {}) {
   const r = await api(
     "/records?status=" +
-      encodeURIComponent(recordStatus) +
+      encodeURIComponent(status) +
       "&q=" +
-      encodeURIComponent(recordSearch) +
+      encodeURIComponent(search) +
       "&offset=" +
-      recordOffset,
+      offset,
   );
   return (
     heading(
@@ -296,7 +342,7 @@ async function records() {
       "查看 A 中转与 B 私信的独立记录，定位每次消息流转的结果。",
       '<button class="secondary" id="refresh-records">刷新记录</button>',
     ) +
-    `<section class="panel"><div class="panel-head"><div class="filters"><input id="record-search" aria-label="按用户名搜索" placeholder="搜索 @用户名" value="${E(recordSearch)}"><select id="record-status" aria-label="发送状态"><option value="">全部状态</option>${["pending", "waiting", "sending", "sent", "failed", "unknown", "skipped", "cancelled"].map((s) => `<option value="${s}" ${recordStatus === s ? "selected" : ""}>${labels[s]}</option>`).join("")}</select><button class="secondary small" id="search-records">筛选</button></div><span class="muted">${r.total} 条记录</span></div>${r.items.length ? `<div class="table-wrap"><table><thead><tr><th>阶段 / 时间</th><th>用户 / 来源</th><th>发送内容</th><th>状态</th><th>操作</th></tr></thead><tbody>${r.items.map((j) => `<tr><td>${j.stage === "relay" ? "A → 中转群" : "B → 私信"}<small>${E(date(j.created_at))}</small><small>任务 #${j.task_id}</small><small>${j.stage === "relay" ? "监测" : "接收"}群 ID ${E(j.chat_id)}</small></td><td>@${E(j.username)}<small>${E(j.source_title)}</small>${j.user_id ? `<small>ID ${j.user_id}</small>` : ""}</td><td><div class="record-text">${E(j.text)}</div><details><summary>原始发言</summary><div class="record-text">${E(j.original_text)}</div></details></td><td>${badge(j.status)}${j.error ? `<small class="error-text">${E(j.error)}</small>` : ""}${j.status === "waiting" ? `<small>${E(date(j.due_at))}</small>` : ""}</td><td><div class="actions">${["pending", "waiting"].includes(j.status) ? `<button class="secondary small" data-cancel-job="${j.id}">取消</button>` : ""}${j.user_id ? `<button class="text-button small" data-block-user="${j.user_id}">不再联系</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("没有符合条件的记录", "任务运行后，关键词命中和自动私信结果会显示在这里。")}<div class="pagination"><span>每页 50 条</span><div class="actions"><button class="secondary small" id="prev-page" ${recordOffset === 0 ? "disabled" : ""}>上一页</button><button class="secondary small" id="next-page" ${recordOffset + 50 >= r.total ? "disabled" : ""}>下一页</button></div></div></section>`
+    `<section class="panel"><div class="panel-head"><div class="filters"><input id="record-search" aria-label="按用户名搜索" placeholder="搜索 @用户名" value="${E(search)}"><select id="record-status" aria-label="发送状态"><option value="">全部状态</option>${["pending", "waiting", "sending", "sent", "failed", "unknown", "skipped", "cancelled"].map((s) => `<option value="${s}" ${status === s ? "selected" : ""}>${labels[s]}</option>`).join("")}</select><button class="secondary small" id="search-records">筛选</button></div><span class="muted">${r.total} 条记录</span></div>${r.items.length ? `<div class="table-wrap"><table><thead><tr><th>阶段 / 时间</th><th>用户 / 来源</th><th>发送内容</th><th>状态</th><th>操作</th></tr></thead><tbody>${r.items.map((j) => `<tr><td>${j.stage === "relay" ? "A → 中转群" : "B → 私信"}<small>${E(date(j.created_at))}</small><small>任务 #${j.task_id}</small><small>${j.stage === "relay" ? "监测" : "接收"}群 ID ${E(j.chat_id)}</small></td><td>@${E(j.username)}<small>${E(j.source_title)}</small>${j.user_id ? `<small>ID ${j.user_id}</small>` : ""}</td><td><div class="record-text">${E(j.text)}</div><details><summary>原始发言</summary><div class="record-text">${E(j.original_text)}</div></details></td><td>${badge(j.status)}${j.error ? `<small class="error-text">${E(j.error)}</small>` : ""}${j.status === "waiting" ? `<small>${E(date(j.due_at))}</small>` : ""}</td><td><div class="actions">${["pending", "waiting"].includes(j.status) ? `<button class="secondary small" data-cancel-job="${j.id}">取消</button>` : ""}${j.user_id ? `<button class="text-button small" data-block-user="${j.user_id}">不再联系</button>` : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("没有符合条件的记录", "任务运行后，关键词命中和自动私信结果会显示在这里。")}<div class="pagination"><span>每页 50 条</span><div class="actions"><button class="secondary small" id="prev-page" ${offset === 0 ? "disabled" : ""}>上一页</button><button class="secondary small" id="next-page" ${offset + 50 >= r.total ? "disabled" : ""}>下一页</button></div></div></section>`
   );
 }
 async function guards() {
@@ -317,16 +363,79 @@ function settings() {
     `<section class="panel"><div class="panel-head"><h2>运行配置</h2></div><div class="panel-body"><div class="setting-row"><div><strong>后台服务</strong><p>启动状态会保存，服务器重启后按保存的状态恢复。</p></div>${badge(state.running ? "active" : "disabled", state.running ? "运行中" : "已暂停")}</div><div class="setting-row"><div><strong>消息去重</strong><p>使用 Telegram 用户 ID 跨任务去重。结果不确定的发送不会自动重试。</p></div><span class="badge good">已启用</span></div><div class="setting-row"><div><strong>历史消息</strong><p>首次启动不扫描中转群历史，仅响应启动后的新消息。</p></div><span class="badge">仅新消息</span></div><div class="setting-row"><div><strong>服务器部署</strong><p>Linux · 单服务进程 · 本地持久化存储。部署步骤见项目 DEPLOYMENT.zh.md。</p></div><span class="badge">本地存储</span></div></div></section><section class="panel"><div class="panel-head"><h2>后台密码</h2></div><div class="panel-body"><form id="password-form"><div class="form-grid"><label>当前密码<input type="password" name="current_password" autocomplete="current-password" required></label><label>新密码<input type="password" name="new_password" autocomplete="new-password" minlength="12" required><small>至少 12 个字符。修改后请重新登录。</small></label></div><div class="form-error" role="alert"></div><button type="submit">更新密码</button></form></div></section>`
   );
 }
-async function render() {
+async function render({ background = false, revision = ++renderRevision } = {}) {
+  if (revision !== renderRevision) return;
   document.title = titles[page] + " · Telegram Ops";
   $("#crumb").textContent = titles[page];
   $$("[data-page]").forEach((a) =>
     a.classList.toggle("active", a.dataset.page === page),
   );
-  $("#content").innerHTML = await (
-    { overview, accounts, tasks, records, guards, settings }[page] || overview
-  )();
+  let html;
+  try {
+    html = await (
+      { overview, accounts, tasks, records, guards, settings }[page] || overview
+    )();
+  } catch (e) {
+    if (revision !== renderRevision) return;
+    throw e;
+  }
+  if (revision !== renderRevision) return;
+  // A response may arrive after an editor opens. Never replace its opener then.
+  if (background && (document.hidden || $("#modal").open)) return;
+  if (page === "overview" && html === renderedOverview) return;
+  const active = document.activeElement;
+  const focusAttribute = ["data-edit-task", "data-toggle-task", "data-new-task"]
+    .find((name) => active?.hasAttribute(name));
+  const focusSelector = focusAttribute
+    ? `[${focusAttribute}="${CSS.escape(active.getAttribute(focusAttribute))}"]`
+    : active?.matches("#content a[href]")
+      ? `#content a[href="${CSS.escape(active.getAttribute("href"))}"]`
+      : null;
+  const scroll = [window.scrollX, window.scrollY];
+  $("#content").innerHTML = html;
+  renderedOverview = page === "overview" ? html : null;
   bindPage();
+  if (background) {
+    if (focusSelector) ($(focusSelector) || $("#content")).focus({ preventScroll: true });
+    window.scrollTo(...scroll);
+  }
+}
+
+async function updateRecords(button, query) {
+  if (recordsPending) return;
+  recordsPending = true;
+  const revision = ++renderRevision;
+  const content = $("#content");
+  const controls = [...content.querySelectorAll("button, input, select")]
+    .map((element) => [element, element.disabled]);
+  const label = button.textContent;
+  controls.forEach(([element]) => { element.disabled = true; });
+  button.textContent = "加载中…";
+  content.setAttribute("aria-busy", "true");
+  try {
+    const html = await records(query);
+    if (revision !== renderRevision) return;
+    // Commit applied filters only after success; failures retain the old page.
+    recordOffset = query.offset;
+    recordStatus = query.status;
+    recordSearch = query.search;
+    const scroll = [window.scrollX, window.scrollY];
+    content.innerHTML = html;
+    bindPage();
+    const nextFocus = document.getElementById(button.id);
+    (nextFocus && !nextFocus.disabled ? nextFocus : content).focus({ preventScroll: true });
+    window.scrollTo(...scroll);
+    toast("记录已更新");
+  } catch (e) {
+    if (revision === renderRevision) toast(e.message);
+  } finally {
+    controls.forEach(([element, disabled]) => {
+      if (element.isConnected) element.disabled = disabled;
+    });
+    if (button.isConnected) button.textContent = label;
+    content.removeAttribute("aria-busy");
+    recordsPending = false;
+  }
 }
 function accountDialog() {
   loginDialog(null, accountTab);
@@ -453,9 +562,9 @@ function taskDialog(id, monitorId) {
     <label>绑定名称<input name="name" value="${E(t.name)}" required maxlength="120" placeholder="例如：产品咨询监测"></label>
     <div class="form-grid" style="margin-top:20px"><label class="span-2">监测账号<select name="account_a">${options}</select></label>
     <label>监测群组 ID<textarea name="source_chats" rows="4" required placeholder="-1001234567890\n-1009876543210">${E(t.source_chats.join("\n"))}</textarea><small>每行一个完整 ID；只有这些来源群进入筛选。</small></label>
-    <label>转发目标群组 ID<input name="relay_chat" value="${E(t.relay_chat)}" required placeholder="-1001122334455"><small>本条绑定的消息只发送到这个 ID。不同目标可建立多条绑定。</small></label></div>
-    <div class="callout">账号需已加入来源群和目标群，并能在目标群发消息。不需要同步群组列表，也不需要先配置私信账号。</div>
-    <div class="form-section"><div class="section-title">消息过滤</div><div class="form-grid"><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><label>忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label><label>包含关键词<textarea name="keywords" required>${E(t.keywords)}</textarea></label><label>排除关键词<textarea name="exclude_keywords">${E(t.exclude_keywords)}</textarea></label></div></div>
+    <label>转发目标群组 ID（支持私有群）<input name="relay_chat" value="${E(t.relay_chat ?? "")}" placeholder="可暂时留空"><small>填写私有群或公开群的完整数字 ID，不填邀请链接或 @用户名。可暂时留空保存，补填后才能启用。</small></label></div>
+    <div class="callout">私有群无需改成公开群。所选监测账号须已加入来源群和转发目标群，并拥有目标群发言权限；仅填写 ID 不会自动加入群组。不需要先配置私信账号。</div>
+    <div class="form-section"><div class="section-title">消息过滤</div><div class="form-grid"><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><label>忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label><label>包含关键词<textarea name="keywords" required placeholder="例如：携程 卡密 大润发 盒马">${E(t.keywords)}</textarea><small>用空格分隔关键词，也支持换行、逗号。</small></label><label>排除关键词<textarea name="exclude_keywords">${E(t.exclude_keywords)}</textarea><small>用空格分隔排除词，命中任意一个即排除；也支持换行、逗号。</small></label></div></div>
     <p class="preview-label">固定转发格式</p><div class="preview-box">群组-该用户发言的内容-@用户名</div>
     ${t.template ? `<details class="simulation"><summary>原任务私信文案（兼容已有配置）</summary><label>任务独立文案<textarea name="template" maxlength="3500">${E(t.template)}</textarea><small>清空后使用私信账号设置的文案。</small></label></details>` : ""}
     <details class="simulation"><summary>模拟测试过滤与消息格式（不会发送）</summary>${previewFields()}</details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">${id ? "保存更改并暂停" : "保存绑定（暂停）"}</button></div></form>`,
@@ -465,9 +574,9 @@ function taskDialog(id, monitorId) {
     const data = Object.fromEntries(fd);
     data.account_a = Number(fd.get("account_a"));
     data.source_chats = parseGroupIds(fd.get("source_chats"));
-    const target = parseGroupIds(fd.get("relay_chat"));
-    if (target.length !== 1) throw Error("每条绑定只能设置一个转发目标群 ID");
-    data.relay_chat = target[0];
+    const target = parseGroupIds(fd.get("relay_chat"), true);
+    if (target.length > 1) throw Error("每条绑定只能设置一个转发目标群 ID");
+    data.relay_chat = target[0] ?? null;
     if (data.source_chats.includes(data.relay_chat))
       throw Error("转发群不能同时作为监测来源群");
     data.template = fd.get("template") || "";
@@ -503,7 +612,7 @@ async function runPreview(form) {
 function previewDialog() {
   openModal(
     "模拟测试 · 不会发送消息",
-    `<form id="preview-form"><div class="form-grid"><label>包含关键词<textarea name="keywords" placeholder="例如：咨询，服务"></textarea></label><label>排除关键词<textarea name="exclude_keywords" placeholder="例如：广告"></textarea></label><label class="span-2">私信文案<textarea name="template" placeholder="填写文案，可使用 {{ username }}"></textarea></label></div>${previewFields()}</form>`,
+    `<form id="preview-form"><div class="form-grid"><label>包含关键词<textarea name="keywords" placeholder="例如：咨询 服务"></textarea><small>用空格分隔关键词，也支持换行、逗号。</small></label><label>排除关键词<textarea name="exclude_keywords" placeholder="例如：广告 推广"></textarea><small>用空格分隔排除词，也支持换行、逗号。</small></label><label class="span-2">私信文案<textarea name="template" placeholder="填写文案，可使用 {{ username }}"></textarea></label></div>${previewFields()}</form>`,
   );
   $("#preview-form").onsubmit = (e) => e.preventDefault();
   $("#run-preview").onclick = () => runPreview($("#preview-form"));
@@ -625,23 +734,21 @@ function bindPage() {
   if ($("#standalone-preview"))
     $("#standalone-preview").onclick = previewDialog;
   if ($("#search-records"))
-    $("#search-records").onclick = async () => {
-      recordSearch = $("#record-search").value;
-      recordStatus = $("#record-status").value;
-      recordOffset = 0;
-      await render();
-    };
-  if ($("#refresh-records")) $("#refresh-records").onclick = () => load();
-  if ($("#prev-page"))
-    $("#prev-page").onclick = async () => {
-      recordOffset = Math.max(0, recordOffset - 50);
-      await render();
-    };
-  if ($("#next-page"))
-    $("#next-page").onclick = async () => {
-      recordOffset += 50;
-      await render();
-    };
+    $("#search-records").onclick = (e) => updateRecords(e.currentTarget, {
+      search: $("#record-search").value,
+      status: $("#record-status").value,
+      offset: 0,
+    });
+  for (const [id, offset] of [
+    ["refresh-records", recordOffset],
+    ["prev-page", Math.max(0, recordOffset - 50)],
+    ["next-page", recordOffset + 50],
+  ]) {
+    if ($("#" + id)) $("#" + id).onclick = (e) => updateRecords(
+      e.currentTarget,
+      { search: recordSearch, status: recordStatus, offset },
+    );
+  }
   $$("[data-cancel-job]").forEach(
     (b) =>
       (b.onclick = () =>
@@ -692,10 +799,17 @@ load().catch((e) => {
   );
 });
 setInterval(async () => {
-  if (document.hidden || $("#modal").open) return;
+  if (document.hidden || $("#modal").open || stateRequest || servicePending) return;
+  const revision = renderRevision;
+  const requestedStateRevision = stateRevision;
   try {
-    state = await api("/state");
-    serviceHeader();
-    if (page === "overview") await render();
-  } catch {}
+    const applied = await readState();
+    if (applied && page === "overview" && !$("#content button:disabled"))
+      await render({ background: true, revision });
+  } catch (e) {
+    if (requestedStateRevision !== stateRevision) return;
+    // Notify once per outage, not every tick. A later successful read resets it.
+    if (!pollFailed) toast("状态刷新失败：" + e.message);
+    pollFailed = true;
+  }
 }, 15000);

@@ -26,7 +26,6 @@ templates = Jinja2Templates(directory=str(settings.templates_dir))
 async def lifespan(app: FastAPI):
     if settings.app_secret_key == "change-me-at-least-32-chars" or (settings.admin_password == "admin123456" and not settings.admin_password_hash):
         raise RuntimeError("请先运行 scripts/setup_console.py 生成独立后台凭据")
-    init_db()
     from app.database import session_scope
     from app.relay_models import ConsoleState
     # One process owns Telegram sessions and delivery queue.
@@ -40,6 +39,11 @@ async def lifespan(app: FastAPI):
     except BlockingIOError:
         process_lock.close()
         raise RuntimeError("Only one console server process may run per working directory")
+    try:
+        init_db()
+    except Exception:
+        process_lock.close()
+        raise
     with session_scope() as db:
         saved = db.get(ConsoleState, "running")
         should_start = saved.value == "true" if saved else settings.auto_start_telegram_workers
@@ -130,15 +134,6 @@ def admin_logout():
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
     return redirect("/console")
-    data = {
-        "accounts": db.query(Account).count(),
-        "active_accounts": db.query(Account).filter(Account.status == "active").count(),
-        "chats": db.query(Chat).count(),
-        "rules": db.query(Rule).count(),
-        "leads": db.query(Lead).count(),
-        "pending": db.query(SendQueue).filter(SendQueue.status == "pending").count(),
-    }
-    return templates.TemplateResponse("dashboard.html", {"request": request, "data": data})
 
 
 @app.get("/accounts", response_class=HTMLResponse)
@@ -183,7 +178,7 @@ def create_account(
 
 
 @app.post("/accounts/{account_id}/toggle")
-def toggle_account(account_id: int, db: Session = Depends(get_db)):
+async def toggle_account(account_id: int, db: Session = Depends(get_db)):
     account = db.get(Account, account_id)
     if not account:
         raise HTTPException(404, "account not found")
@@ -194,7 +189,8 @@ def toggle_account(account_id: int, db: Session = Depends(get_db)):
 
 @app.post("/accounts/{account_id}/send-code")
 async def account_send_code(account_id: int):
-    await send_login_code(account_id)
+    async with manager.account_lock(account_id):
+        await send_login_code(account_id)
     return redirect(f"/accounts/{account_id}/login")
 
 
@@ -208,14 +204,17 @@ def login_page(account_id: int, request: Request, db: Session = Depends(get_db))
 
 @app.post("/accounts/{account_id}/verify")
 async def account_verify(account_id: int, code: str = Form(...), password: str = Form("")):
-    await verify_login_code(account_id, code, password or None)
+    async with manager.account_lock(account_id):
+        await verify_login_code(account_id, code, password or None)
     await manager.reload_workers()
     return redirect("/accounts")
 
 
 @app.post("/accounts/{account_id}/sync-chats")
 async def account_sync_chats(account_id: int):
-    await sync_account_chats(account_id)
+    async with manager.account_lock(account_id):
+        await manager.disconnect_account(account_id)
+        await sync_account_chats(account_id)
     return redirect("/chats")
 
 
@@ -324,7 +323,7 @@ def guards_page(request: Request, db: Session = Depends(get_db)):
 
 
 @app.post("/guards")
-def upsert_guard(
+async def upsert_guard(
     telegram_user_id: int = Form(...),
     username: str = Form(""),
     blacklisted: bool = Form(False),

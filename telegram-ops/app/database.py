@@ -36,6 +36,8 @@ def init_db() -> None:
     from app import models, relay_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    from app.schema_updates import allow_unconfigured_relay_target
+    allow_unconfigured_relay_target(engine)
     from app.account_settings import migrate_profiles
     with session_scope() as db:
         migrate_profiles(db)

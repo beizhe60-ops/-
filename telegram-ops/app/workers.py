@@ -16,6 +16,7 @@ from telethon.errors import (
 from telethon.sessions import StringSession
 from telethon.tl.types import UpdateNewMessage, UpdateNewChannelMessage
 
+from app.telegram_client import CONNECT_TIMEOUT_SECONDS, DISCONNECT_TIMEOUT_SECONDS
 from app.crypto import decrypt_text, encrypt_text
 from app.database import session_scope
 from app.enums import (
@@ -98,7 +99,7 @@ class TelegramWorker:
                 self._mark_status(ACCOUNT_STATUS_PROXY_ERROR, str(exc))
                 await asyncio.sleep(30)
             except Exception as exc:
-                print(f"[ERROR] Worker exception: {exc}")
+                logger.error("Legacy worker failed account=%s error_type=%s", self.account_id, type(exc).__name__)
                 self._mark_status(ACCOUNT_STATUS_LIMITED, str(exc))
                 await asyncio.sleep(30)
 
@@ -179,7 +180,7 @@ class TelegramWorker:
             user_id = message.from_id.user_id if hasattr(message, 'from_id') and hasattr(message.from_id, 'user_id') else None
             message_id = message.id
             
-            print(f"[MSG] {telegram_chat_id}|{user_id}|{text[:30]}")
+            logger.debug("Legacy message account=%s chat=%s message=%s", self.account_id, telegram_chat_id, message_id)
             
             # 数据库处理
             with session_scope() as db:
@@ -207,7 +208,7 @@ class TelegramWorker:
                 )
                 process_incoming_message(db, ctx)
         except Exception as e:
-            print(f"[ERROR] {e}")
+            logger.error("Legacy message failed account=%s error_type=%s", self.account_id, type(e).__name__)
 
     async def _handle_message(self, event: Any) -> None:
         """处理消息事件（备用）"""
@@ -226,7 +227,7 @@ class TelegramWorker:
             telegram_chat_id = int(event.chat_id)
             message_id = getattr(event.message, "id", None)
             
-            print(f"[MSG] {telegram_chat_id}|{text[:30]}")
+            logger.debug("Legacy message account=%s chat=%s message=%s", self.account_id, telegram_chat_id, message_id)
             
 
             # 数据库处理
@@ -255,7 +256,7 @@ class TelegramWorker:
                 )
                 process_incoming_message(db, ctx)
         except Exception as e:
-            print(f"[ERROR] {e}")
+            logger.error("Legacy message failed account=%s error_type=%s", self.account_id, type(e).__name__)
 
 
 class WorkerManager:
@@ -397,15 +398,19 @@ class WorkerManager:
 manager = WorkerManager()
 
 
+class TwoStepPasswordRequired(ValueError):
+    """The login flow explicitly requires a two-step password."""
+
+
 async def send_login_code(account_id: int) -> None:
     with session_scope() as db:
         account = db.get(Account, account_id)
         if not account:
             raise ValueError("account not found")
-        client = make_client(account)
+        client = make_client(account, for_login=True)
         phone = account.phone
-    await client.connect()
     try:
+        await client.connect()
         sent = await client.send_code_request(phone)
         session_string = StringSession.save(client.session)
         with session_scope() as db:
@@ -427,18 +432,18 @@ async def verify_login_code(account_id: int, code: str, password: str | None = N
         if not account:
             raise ValueError("account not found")
         temp_session = decrypt_text(account.login_temp_session_string_encrypted)
-        client = make_client(account, session_string=temp_session)
+        client = make_client(account, session_string=temp_session, for_login=True)
         phone = account.phone
         phone_code_hash = account.phone_code_hash
-    await client.connect()
     try:
+        await client.connect()
         from app.relay_models import ConsoleState
         key = f"login_2fa:{account_id}"
         with session_scope() as db:
             needs_password = db.get(ConsoleState, key) is not None
         if needs_password:
             if not password:
-                raise ValueError("two-step password is required")
+                raise TwoStepPasswordRequired("two-step password is required")
             await client.sign_in(password=password)
         else:
             try:
@@ -448,7 +453,7 @@ async def verify_login_code(account_id: int, code: str, password: str | None = N
                     with session_scope() as db:
                         db.merge(ConsoleState(key=key, value="true"))
                         db.get(Account, account_id).login_temp_session_string_encrypted = encrypt_text(StringSession.save(client.session))
-                    raise ValueError("two-step password is required")
+                    raise TwoStepPasswordRequired("two-step password is required")
                 await client.sign_in(password=password)
         with session_scope() as db:
             flag = db.get(ConsoleState, key)
@@ -474,15 +479,18 @@ async def sync_account_chats(account_id: int) -> int:
         session_string = decrypt_text(account.session_string_encrypted)
         client = make_client(account, session_string=session_string)
     count = 0
-    await client.connect()
     try:
-        if not await client.is_user_authorized():
-            with session_scope() as db:
-                account = db.get(Account, account_id)
-                account.status = ACCOUNT_STATUS_LOGIN_REQUIRED
-            return 0
-        dialogs = await client.get_dialogs()
+        async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
+            await client.connect()
+            if not await client.is_user_authorized():
+                with session_scope() as db:
+                    account = db.get(Account, account_id)
+                    account.status = ACCOUNT_STATUS_LOGIN_REQUIRED
+                return 0
+            dialogs = await client.get_dialogs()
         with session_scope() as db:
+            existing_chats = {chat.telegram_chat_id: chat for chat in
+                              db.query(Chat).filter(Chat.account_id == account_id).all()}
             for dialog in dialogs:
                 entity = dialog.entity
                 telegram_chat_id = int(dialog.id)
@@ -494,29 +502,33 @@ async def sync_account_chats(account_id: int) -> int:
                     chat_type = "group"
                 else:
                     continue
-                existing = db.query(Chat).filter(Chat.account_id == account_id, Chat.telegram_chat_id == telegram_chat_id).first()
+                existing = existing_chats.get(telegram_chat_id)
                 if not existing:
                     existing = Chat(account_id=account_id, telegram_chat_id=telegram_chat_id, title=dialog.name or str(telegram_chat_id), type=chat_type)
                     db.add(existing)
+                    existing_chats[telegram_chat_id] = existing
                 existing.title = dialog.name or existing.title
                 existing.type = chat_type
                 existing.last_sync_at = datetime.utcnow()
                 count += 1
             _assign_primary_listeners(db)
     finally:
-        await client.disconnect()
+        await asyncio.wait_for(client.disconnect(), timeout=DISCONNECT_TIMEOUT_SECONDS)
     return count
 
 
 def _assign_primary_listeners(db) -> None:
-    chat_ids = [row[0] for row in db.query(Chat.telegram_chat_id).filter(Chat.enabled.is_(True)).distinct().all()]
-    for telegram_chat_id in chat_ids:
-        chats = (
-            db.query(Chat)
-            .join(Account, Account.id == Chat.account_id)
-            .filter(Chat.telegram_chat_id == telegram_chat_id, Chat.enabled.is_(True))
-            .order_by((Account.status == ACCOUNT_STATUS_ACTIVE).desc(), Chat.id.asc())
-            .all()
-        )
-        for index, chat in enumerate(chats):
-            chat.is_primary_listener = index == 0
+    # Include just-synchronized rows: SessionLocal intentionally disables autoflush.
+    db.flush()
+    chats = (
+        db.query(Chat)
+        .join(Account, Account.id == Chat.account_id)
+        .filter(Chat.enabled.is_(True))
+        .order_by(Chat.telegram_chat_id.asc(),
+                  (Account.status == ACCOUNT_STATUS_ACTIVE).desc(), Chat.id.asc())
+        .all()
+    )
+    seen = set()
+    for chat in chats:
+        chat.is_primary_listener = chat.telegram_chat_id not in seen
+        seen.add(chat.telegram_chat_id)

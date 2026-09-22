@@ -1,0 +1,22 @@
+{
+  "cycles_1": {
+    "documents": 1,
+    "nodes": 351,
+    "jsEventListeners": 26
+  },
+  "cycles_40": {
+    "documents": 1,
+    "nodes": 351,
+    "jsEventListeners": 26
+  },
+  "cycles_80": {
+    "documents": 1,
+    "nodes": 351,
+    "jsEventListeners": 26
+  },
+  "overlapping_ticks_max_inflight": 2,
+  "initial_error_visible": "⌁\n暂时无法加载工作空间\n\nsimulated failure\n\n重新加载",
+  "search_failure_pageerrors": [
+    "simulated failure"
+  ]
+}

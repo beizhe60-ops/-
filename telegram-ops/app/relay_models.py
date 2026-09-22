@@ -23,7 +23,7 @@ class RelayTask(Base, TimestampMixin):
     account_a: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     account_b: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     source_chats: Mapped[str] = mapped_column(Text, default="[]")
-    relay_chat: Mapped[int] = mapped_column(BigInteger)
+    relay_chat: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     keywords: Mapped[str] = mapped_column(Text)
     exclude_keywords: Mapped[str] = mapped_column(Text, default="")
     ignore_users: Mapped[str] = mapped_column(Text, default="")
