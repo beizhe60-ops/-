@@ -118,6 +118,7 @@ class ApplicationInput(BaseModel):
 class AiSummaryInput(BaseModel):
     enabled: bool = False
     account_id: int = Field(gt=0)
+    source_chat_ids: list[int] = Field(default_factory=list, max_length=200)
     api_url: str = Field(default="https://api.openai.com/v1/chat/completions", min_length=8, max_length=500)
     api_key: str = Field(default="", max_length=512)
     model: str = Field(default="gpt-4o-mini", min_length=1, max_length=120)
@@ -127,6 +128,13 @@ class AiSummaryInput(BaseModel):
     schedule_time: str = Field(default="23:00", pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
     message_count: int = Field(default=50, ge=1, le=1000)
     lookback_hours: int = Field(default=24, ge=1, le=168)
+
+    @field_validator("source_chat_ids")
+    @classmethod
+    def valid_source_ids(cls, values):
+        if any(type(v) is not int or v >= 0 or v < -(2**52) for v in values):
+            raise ValueError("AI 分析群组 ID 必须是完整的负整数")
+        return sorted(set(values))
 
 
 def ai_settings(db):
@@ -142,6 +150,7 @@ def ai_settings_payload(db):
         "configured": True,
         "enabled": bool(value.get("enabled")),
         "account_id": value.get("account_id"),
+        "source_chat_ids": value.get("source_chat_ids", []),
         "api_url": value.get("api_url"),
         "model": value.get("model"),
         "trigger": value.get("trigger"),
@@ -164,6 +173,8 @@ def save_ai_settings(data: AiSummaryInput, db: Session = Depends(get_db)):
     account = required(db, Account, data.account_id)
     if get_profile(db, account).role != "monitor":
         raise HTTPException(422, "AI 摘要必须使用监测账号发送")
+    if data.enabled and not data.source_chat_ids:
+        raise HTTPException(422, "启用 AI 摘要时请至少填写一个 AI 分析群组 ID")
     existing = ai_settings(db) or {}
     if not data.api_key.strip() and not existing.get("api_key_encrypted"):
         raise HTTPException(422, "首次配置 AI 摘要时必须填写 API Key")
