@@ -4,6 +4,7 @@ The endpoint follows the OpenAI-compatible chat-completions shape so the
 operator can use OpenAI or a compatible provider without exposing the key.
 """
 import json
+import urllib.error
 import urllib.request
 
 
@@ -37,8 +38,15 @@ def request_summary(api_url: str, api_key: str, model: str, messages: list[dict]
             "Authorization": f"Bearer {api_key}",
         },
     )
-    with urllib.request.urlopen(request, timeout=90) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            raise ValueError("AI 接口鉴权失败，请检查 API Key 是否正确或已过期") from exc
+        raise ValueError(f"AI 接口请求失败（HTTP {exc.code}）") from exc
+    except urllib.error.URLError as exc:
+        raise ValueError("AI 接口暂时无法连接，请检查接口地址和服务器网络") from exc
     try:
         content = payload["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
