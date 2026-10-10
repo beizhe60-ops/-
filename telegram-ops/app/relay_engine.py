@@ -8,6 +8,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -18,12 +19,13 @@ from telethon.tl.types import User
 from app.crypto import decrypt_text
 from app.database import session_scope
 from app.models import Account, UserGuard
-from app.relay_models import RelayTask, RelayJob, ContactReceipt
+from app.relay_models import RelayTask, RelayJob, ContactReceipt, AiSummaryMessage
 from app.relay_models import AccountProfile, SenderWeight, ConsoleState, SenderBinding
 from app.relay_logic import filter_message, format_relay, parse_relay, render_copy
 from app.telegram_client import (
     make_client, CONNECT_TIMEOUT_SECONDS, SEND_TIMEOUT_SECONDS, DISCONNECT_TIMEOUT_SECONDS,
 )
+from app.ai_summary import request_summary
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +38,8 @@ class RelayEngine:
         self.workers = {}
         self.identities = {}
         self.loop_task = None
+        self.ai_task = None
+        self.ai_run_lock = asyncio.Lock()
         self.lock = asyncio.Lock()
         self.account_locks = {}
         self.send_tasks = {}
@@ -58,6 +62,7 @@ class RelayEngine:
                 )
             self.running = True
             self.loop_task = asyncio.create_task(self.run())
+            self.ai_task = asyncio.create_task(self.ai_summary_loop())
 
     async def stop(self):
         async with self.lifecycle_lock:
@@ -65,6 +70,8 @@ class RelayEngine:
             tasks = list(self.send_tasks.values()) + list(self.connection_tasks.values())
             if self.loop_task:
                 tasks.append(self.loop_task)
+            if self.ai_task:
+                tasks.append(self.ai_task)
             for task in tasks:
                 task.cancel()
             if tasks:
@@ -78,6 +85,7 @@ class RelayEngine:
             self.workers.clear()
             self.identities.clear()
             self.loop_task = None
+            self.ai_task = None
 
     @staticmethod
     async def close_client(client):
@@ -214,6 +222,77 @@ class RelayEngine:
         finally:
             self.running = False
 
+    async def ai_summary_loop(self):
+        while self.running:
+            try:
+                await self.generate_ai_summary(force=False)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("AI summary iteration failed")
+            await asyncio.sleep(30)
+
+    async def generate_ai_summary(self, force=False):
+        """Generate and send one summary through the configured monitor account."""
+        async with self.ai_run_lock:
+            with session_scope() as db:
+                row = db.get(ConsoleState, "ai_summary_settings")
+                config = json.loads(row.value) if row else None
+                if not config or (not force and not config.get("enabled")):
+                    return {"sent": False, "reason": "AI 摘要未启用"}
+                if not config.get("api_key_encrypted"):
+                    raise ValueError("请先配置 AI API Key")
+                now_local = datetime.now(ZoneInfo("Asia/Shanghai"))
+                last = db.get(ConsoleState, "ai_summary_last_run")
+                last_key = last.value if last else ""
+                trigger = config.get("trigger", "schedule")
+                run_key = now_local.strftime("%Y-%m-%d")
+                if not force and trigger == "schedule":
+                    if now_local.strftime("%H:%M") != config.get("schedule_time", "23:00") or last_key == run_key:
+                        return {"sent": False, "reason": "未到摘要时间"}
+                since = datetime.utcnow() - timedelta(hours=int(config.get("lookback_hours", 24)))
+                if not force and trigger == "count" and last_key:
+                    try:
+                        since = max(since, datetime.fromisoformat(last_key))
+                    except ValueError:
+                        pass
+                query = db.query(AiSummaryMessage).filter(AiSummaryMessage.created_at >= since)
+                messages = query.order_by(AiSummaryMessage.created_at.desc()).limit(int(config.get("message_count", 50))).all()
+                if not messages:
+                    return {"sent": False, "reason": "当前时间范围没有可摘要消息"}
+                if not force and trigger == "count" and len(messages) < int(config.get("message_count", 50)):
+                    return {"sent": False, "reason": "尚未达到摘要条数"}
+                account = db.get(Account, int(config["account_id"]))
+                if not account or not account.session_string_encrypted:
+                    raise ValueError("AI 推送账号尚未登录")
+                if not account.send_enabled:
+                    raise ValueError("AI 推送账号未开启发送权限")
+                api_key = decrypt_text(config["api_key_encrypted"])
+                payload = [
+                    {
+                        "created_at": item.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "chat_title": item.chat_title,
+                        "sender_name": item.sender_name,
+                        "text": item.text,
+                    }
+                    for item in reversed(messages)
+                ]
+                target = int(config["target_id"])
+                account_id = account.id
+                api_url = config["api_url"]
+                model = config["model"]
+            worker = self.workers.get(account_id)
+            if not worker or not worker.client.is_connected():
+                raise ValueError("AI 推送账号当前未连接，请先启动服务")
+            summary = await asyncio.to_thread(request_summary, api_url, api_key, model, payload)
+            header = "📊 群组 AI 摘要\n\n"
+            await worker.client.send_message(target, header + summary)
+            with session_scope() as db:
+                db.merge(ConsoleState(key="ai_summary_last_run", value=run_key if trigger == "schedule" else datetime.utcnow().isoformat()))
+                cutoff = datetime.utcnow() - timedelta(days=14)
+                db.query(AiSummaryMessage).filter(AiSummaryMessage.created_at < cutoff).delete()
+            return {"sent": True, "message_count": len(payload), "target_id": target}
+
     async def on_message(self, account_id, event):
         if not self.running or not (event.is_group or event.is_channel):
             return
@@ -230,6 +309,26 @@ class RelayEngine:
                 if profile and profile.role == "monitor"
                 else set()
             )
+        if profile and profile.role == "monitor" and int(event.chat_id) in monitor_ids and not event.out:
+            chat = await event.get_chat()
+            sender = await event.get_sender()
+            sender_name = getattr(sender, "username", None) or getattr(sender, "first_name", None) or getattr(sender, "title", None) or str(event.sender_id or "")
+            chat_title = getattr(chat, "title", str(event.chat_id))
+            with session_scope() as db:
+                exists = db.query(AiSummaryMessage.id).filter(
+                    AiSummaryMessage.account_id == account_id,
+                    AiSummaryMessage.chat_id == int(event.chat_id),
+                    AiSummaryMessage.message_id == int(event.id),
+                ).first()
+                if not exists:
+                    db.add(AiSummaryMessage(
+                        account_id=account_id,
+                        chat_id=int(event.chat_id),
+                        message_id=int(event.id),
+                        chat_title=str(chat_title)[:255],
+                        sender_name=str(sender_name)[:255],
+                        text=text[:12000],
+                    ))
         for task in tasks:
             if task.relay_chat is None:
                 continue

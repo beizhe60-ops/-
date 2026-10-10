@@ -15,6 +15,7 @@ from app.relay_models import (
     AccountProfile,
     SenderWeight,
     SenderBinding,
+    AiSummaryMessage,
 )
 from app.account_settings import get_profile
 from app.relay_logic import filter_message, format_relay, render_copy
@@ -112,6 +113,80 @@ class AccountInput(BaseModel):
 class ApplicationInput(BaseModel):
     api_id: int = Field(gt=0)
     api_hash: str = Field(default="", pattern=r"^([a-fA-F0-9]{32})?$")
+
+
+class AiSummaryInput(BaseModel):
+    enabled: bool = False
+    account_id: int = Field(gt=0)
+    api_url: str = Field(default="https://api.openai.com/v1/chat/completions", min_length=8, max_length=500)
+    api_key: str = Field(default="", max_length=512)
+    model: str = Field(default="gpt-4o-mini", min_length=1, max_length=120)
+    trigger: str = Field(default="schedule", pattern="^(schedule|count|manual)$")
+    target_type: str = Field(default="group", pattern="^(group|private)$")
+    target_id: int = Field(strict=True, ne=0, ge=-(2**52), le=2**52)
+    schedule_time: str = Field(default="23:00", pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    message_count: int = Field(default=50, ge=1, le=1000)
+    lookback_hours: int = Field(default=24, ge=1, le=168)
+
+
+def ai_settings(db):
+    row = db.get(ConsoleState, "ai_summary_settings")
+    return json.loads(row.value) if row else None
+
+
+def ai_settings_payload(db):
+    value = ai_settings(db)
+    if not value:
+        return {"configured": False, "enabled": False, "api_key_configured": False}
+    return {
+        "configured": True,
+        "enabled": bool(value.get("enabled")),
+        "account_id": value.get("account_id"),
+        "api_url": value.get("api_url"),
+        "model": value.get("model"),
+        "trigger": value.get("trigger"),
+        "target_type": value.get("target_type"),
+        "target_id": value.get("target_id"),
+        "schedule_time": value.get("schedule_time"),
+        "message_count": value.get("message_count"),
+        "lookback_hours": value.get("lookback_hours"),
+        "api_key_configured": bool(value.get("api_key_encrypted")),
+    }
+
+
+@router.get("/api/ai/settings")
+def get_ai_settings(db: Session = Depends(get_db)):
+    return ai_settings_payload(db)
+
+
+@router.put("/api/ai/settings")
+def save_ai_settings(data: AiSummaryInput, db: Session = Depends(get_db)):
+    account = required(db, Account, data.account_id)
+    if get_profile(db, account).role != "monitor":
+        raise HTTPException(422, "AI 摘要必须使用监测账号发送")
+    existing = ai_settings(db) or {}
+    if not data.api_key.strip() and not existing.get("api_key_encrypted"):
+        raise HTTPException(422, "首次配置 AI 摘要时必须填写 API Key")
+    if data.target_type == "group" and data.target_id >= 0:
+        raise HTTPException(422, "群组目标 ID 必须是负数")
+    if data.target_type == "private" and data.target_id <= 0:
+        raise HTTPException(422, "私人目标 ID 必须是正数")
+    payload = data.model_dump(exclude={"api_key"})
+    payload["api_key_encrypted"] = (
+        encrypt_text(data.api_key.strip()) if data.api_key.strip() else existing["api_key_encrypted"]
+    )
+    db.merge(ConsoleState(key="ai_summary_settings", value=json.dumps(payload, ensure_ascii=False)))
+    db.commit()
+    return ai_settings_payload(db)
+
+
+@router.post("/api/ai/run")
+async def run_ai_summary():
+    try:
+        result = await manager.generate_ai_summary(force=True)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    return result
 
 
 def application_settings(db):

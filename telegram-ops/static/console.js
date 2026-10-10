@@ -356,10 +356,14 @@ async function guards() {
     `<section class="panel">${items.length ? `<div class="table-wrap"><table><thead><tr><th>用户 ID</th><th>备注</th><th>操作</th></tr></thead><tbody>${items.map((g) => `<tr><td>${g.user_id}</td><td>${E(g.note || "—")}</td><td><button class="secondary small" data-remove-guard="${g.id}">移出名单</button></td></tr>`).join("")}</tbody></table></div>` : empty("名单为空", "可以从消息记录添加用户，也可以在这里输入 Telegram 用户 ID。")}</section>`
   );
 }
-function settings() {
+async function settings() {
+  const ai = await api("/ai/settings");
+  const monitors = state.accounts.filter((a) => a.role === "monitor" && a.has_session);
+  const aiAccountOptions = monitors.map((a) => `<option value="${a.id}" ${ai.account_id === a.id ? "selected" : ""}>${E(a.name)} · ${E(a.phone)}</option>`).join("");
   return (
     heading("系统设置", "控制后台运行和管理访问凭据。") +
     `<section class="panel"><div class="panel-head"><h2>Telegram 连接配置</h2>${badge(state.application?.configured ? "active" : "disabled", state.application?.configured ? "已配置" : "待配置")}</div><div class="panel-body"><p class="subtle">首次使用配置一次，监测账号和私信账号共用；账号登录页面只需手机号、验证码和二级登录密码。修改后用于后续新增账号，不改变现有登录会话。</p><form id="application-form"><div class="form-grid" style="margin-top:20px"><label>API ID<input name="api_id" type="number" min="1" value="${state.application?.api_id || ""}" required></label><label>API Hash<input name="api_hash" type="password" autocomplete="off" placeholder="${state.application?.configured ? "已保存，留空保持不变" : "请输入应用凭据"}" ${state.application?.configured ? "" : "required"}><small>可在 <a href="https://my.telegram.org/apps" target="_blank" rel="noopener noreferrer">Telegram 官方开发者页面</a> 获取。</small></label></div><div class="form-error" role="alert"></div><button type="submit">保存连接配置</button></form></div></section>` +
+    `<section class="panel"><div class="panel-head"><h2>AI 摘要推送</h2>${badge(ai.enabled ? "active" : "disabled", ai.enabled ? "已启用" : (ai.configured ? "已暂停" : "待配置"))}</div><div class="panel-body"><p class="subtle">监听账号收集已绑定监测群的新消息，按条件生成摘要，并由选定的绑定账号发送到群组或私人账号。API Key 只保存加密结果。</p><form id="ai-form"><div class="form-grid" style="margin-top:20px"><label>推送账号<select name="account_id" required>${aiAccountOptions || '<option value="">请先登录监测账号</option>'}</select><small>只能选择已登录的监测账号。</small></label><label class="checkbox-label"><input type="checkbox" name="enabled" ${ai.enabled ? "checked" : ""}>启用自动摘要</label><label>AI 接口地址<input name="api_url" value="${E(ai.api_url || "https://api.openai.com/v1/chat/completions")}" required></label><label>模型<input name="model" value="${E(ai.model || "gpt-4o-mini")}" required></label><label>API Key<input type="password" name="api_key" placeholder="${ai.api_key_configured ? "已保存，留空保持不变" : "请输入 API Key"}" autocomplete="new-password" ${ai.api_key_configured ? "" : "required"}></label><label>摘要触发方式<select name="trigger"><option value="schedule" ${ai.trigger === "schedule" ? "selected" : ""}>每日定时</option><option value="count" ${ai.trigger === "count" ? "selected" : ""}>达到消息条数</option><option value="manual" ${ai.trigger === "manual" ? "selected" : ""}>仅手动触发</option></select></label><label>推送目标类型<select name="target_type"><option value="group" ${ai.target_type !== "private" ? "selected" : ""}>群组</option><option value="private" ${ai.target_type === "private" ? "selected" : ""}>私人账号</option></select></label><label>推送目标 ID<input name="target_id" type="number" value="${E(ai.target_id || "")}" required><small>群组填写负数（通常 -100 开头）；私人账号填写正数。</small></label><label>每日推送时间<input name="schedule_time" type="time" value="${E(ai.schedule_time || "23:00")}" required></label><label>摘要消息条数<input name="message_count" type="number" min="1" max="1000" value="${E(ai.message_count || 50)}" required></label><label>统计时间范围（小时）<input name="lookback_hours" type="number" min="1" max="168" value="${E(ai.lookback_hours || 24)}" required></label></div><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存 AI 配置</button><button type="button" class="secondary" id="run-ai-summary" ${!ai.configured ? "disabled" : ""}>立即生成并推送</button></div></form></div></section>` +
     `<section class="panel"><div class="panel-head"><h2>运行配置</h2></div><div class="panel-body"><div class="setting-row"><div><strong>后台服务</strong><p>启动状态会保存，服务器重启后按保存的状态恢复。</p></div>${badge(state.running ? "active" : "disabled", state.running ? "运行中" : "已暂停")}</div><div class="setting-row"><div><strong>消息去重</strong><p>使用 Telegram 用户 ID 跨任务去重。结果不确定的发送不会自动重试。</p></div><span class="badge good">已启用</span></div><div class="setting-row"><div><strong>历史消息</strong><p>首次启动不扫描中转群历史，仅响应启动后的新消息。</p></div><span class="badge">仅新消息</span></div><div class="setting-row"><div><strong>服务器部署</strong><p>Linux · 单服务进程 · 本地持久化存储。部署步骤见项目 DEPLOYMENT.zh.md。</p></div><span class="badge">本地存储</span></div></div></section><section class="panel"><div class="panel-head"><h2>后台密码</h2></div><div class="panel-body"><form id="password-form"><div class="form-grid"><label>当前密码<input type="password" name="current_password" autocomplete="current-password" required></label><label>新密码<input type="password" name="new_password" autocomplete="new-password" minlength="12" required><small>至少 12 个字符。修改后请重新登录。</small></label></div><div class="form-error" role="alert"></div><button type="submit">更新密码</button></form></div></section>`
   );
 }
@@ -773,6 +777,36 @@ function bindPage() {
           );
       }),
   );
+  if ($("#ai-form"))
+    setupForm("#ai-form", async (fd) => {
+      await api("/ai/settings", "PUT", {
+        enabled: fd.get("enabled") === "on",
+        account_id: Number(fd.get("account_id")),
+        api_url: fd.get("api_url").trim(),
+        api_key: fd.get("api_key"),
+        model: fd.get("model").trim(),
+        trigger: fd.get("trigger"),
+        target_type: fd.get("target_type"),
+        target_id: Number(fd.get("target_id")),
+        schedule_time: fd.get("schedule_time"),
+        message_count: Number(fd.get("message_count")),
+        lookback_hours: Number(fd.get("lookback_hours")),
+      });
+      await load();
+      toast("AI 摘要配置已保存");
+    });
+  if ($("#run-ai-summary"))
+    $("#run-ai-summary").onclick = async (e) => {
+      e.currentTarget.disabled = true;
+      try {
+        const result = await api("/ai/run", "POST");
+        toast(result.sent ? `已推送摘要（${result.message_count} 条消息）` : result.reason);
+      } catch (ex) {
+        toast(ex.message);
+      } finally {
+        e.currentTarget.disabled = false;
+      }
+    };
   if ($("#password-form"))
     setupForm("#password-form", async (fd) => {
       await api("/password", "POST", Object.fromEntries(fd));

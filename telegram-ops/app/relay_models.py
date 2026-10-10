@@ -88,3 +88,19 @@ class SenderBinding(Base, TimestampMixin):
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
     chat_ids: Mapped[str] = mapped_column(Text, default="[]")
     template: Mapped[str] = mapped_column(Text, default="")
+
+
+class AiSummaryMessage(Base):
+    """Messages captured from configured monitor scopes for AI summaries."""
+    __tablename__ = "ai_summary_messages"
+    __table_args__ = (
+        UniqueConstraint("account_id", "chat_id", "message_id", name="uq_ai_summary_message"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), index=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    message_id: Mapped[int] = mapped_column(Integer)
+    chat_title: Mapped[str] = mapped_column(String(255), default="")
+    sender_name: Mapped[str] = mapped_column(String(255), default="")
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
