@@ -312,7 +312,7 @@ class RelayEngine:
             ai_row = db.get(ConsoleState, "ai_summary_settings")
             ai_config = json.loads(ai_row.value) if ai_row else {}
             ai_source_ids = set(ai_config.get("source_chat_ids", []))
-        if profile and profile.role == "monitor" and int(event.chat_id) in ai_source_ids and int(event.chat_id) in monitor_ids and not event.out:
+        if profile and profile.role == "monitor" and int(event.chat_id) in ai_source_ids and not event.out:
             chat = await event.get_chat()
             sender = await event.get_sender()
             sender_name = getattr(sender, "username", None) or getattr(sender, "first_name", None) or getattr(sender, "title", None) or str(event.sender_id or "")
