@@ -54,6 +54,9 @@ class RelayEngine:
         self.last_send_account = 0
         self.last_connection_account = 0
         self.listener_diagnostics = {}
+        self.poll_task = None
+        self.poll_cursors = {}
+        self.poll_status = {}
 
     def note_message(self, account_id, event, outcome, task_id=None):
         """Bounded metadata only: no message text, usernames or login secrets."""
@@ -66,8 +69,22 @@ class RelayEngine:
         client = worker.client if worker else None
         # Telethon's transport connection alone does not prove its update task is alive.
         update_task = getattr(client, "_updates_handle", None)
+        wait_chain = []
+        current = update_task.get_coro() if update_task else None
+        for _ in range(12):
+            if current is None:
+                break
+            code = getattr(current, "cr_code", None)
+            if code:
+                wait_chain.append(code.co_name)
+            current = getattr(current, "cr_await", None)
         return dict(connected=bool(client and client.is_connected()),
                     update_loop_running=not update_task.done() if update_task else None,
+                    update_wait=wait_chain,
+                    updates_enabled=not getattr(client, "_no_updates", False) if client else False,
+                    queued_updates=client._updates_queue.qsize() if client and hasattr(client, "_updates_queue") else None,
+                    handler_count=len(client.list_event_handlers()) if client and hasattr(client, "list_event_handlers") else None,
+                    polling=self.poll_status.get(account_id),
                     events=list(self.listener_diagnostics.get(account_id, [])))
 
     def account_lock(self, account_id):
@@ -88,6 +105,8 @@ class RelayEngine:
             self.broadcast_task = asyncio.create_task(broadcast_loop(self))
             self.loop_task = asyncio.create_task(self.run())
             self.ai_task = asyncio.create_task(self.ai_summary_loop())
+            from app.listener_poll import poll_loop
+            self.poll_task = asyncio.create_task(poll_loop(self))
 
     async def stop(self):
         async with self.lifecycle_lock:
@@ -99,6 +118,8 @@ class RelayEngine:
                 tasks.append(self.broadcast_task)
             if self.ai_task:
                 tasks.append(self.ai_task)
+            if self.poll_task:
+                tasks.append(self.poll_task)
             for task in tasks:
                 task.cancel()
             if tasks:
@@ -113,6 +134,8 @@ class RelayEngine:
             self.identities.clear()
             self.loop_task = None
             self.ai_task = None
+            self.poll_task = None
+            self.poll_cursors.clear()
 
     @staticmethod
     async def close_client(client):
@@ -125,6 +148,7 @@ class RelayEngine:
         """Caller holds this account's lock; never hold the global lock over I/O."""
         worker = self.workers.pop(account_id, None)
         self.identities.pop(account_id, None)
+        self.poll_cursors.pop(account_id, None)
         if worker:
             await self.close_client(worker.client)
 
