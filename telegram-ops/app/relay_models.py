@@ -3,6 +3,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Boolean,
+    LargeBinary,
     DateTime,
     ForeignKey,
     Integer,
@@ -56,6 +57,7 @@ class RelayJob(Base, TimestampMixin):
     due_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sent_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    copy_options: Mapped[str] = mapped_column(Text, default="{}")
 
 
 class ContactReceipt(Base):
@@ -89,6 +91,7 @@ class SenderBinding(Base, TimestampMixin):
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
     chat_ids: Mapped[str] = mapped_column(Text, default="[]")
     template: Mapped[str] = mapped_column(Text, default="")
+    copy_options: Mapped[str] = mapped_column(Text, default="{}")
 
 
 class AiSummaryMessage(Base):
@@ -140,3 +143,10 @@ class AiSummaryRun(Base):
     message_count: Mapped[int] = mapped_column(Integer, default=0)
     target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     detail: Mapped[str] = mapped_column(Text, default="")
+
+
+class MessageAsset(Base):
+    __tablename__ = "message_assets"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(40))
+    data: Mapped[bytes] = mapped_column(LargeBinary)

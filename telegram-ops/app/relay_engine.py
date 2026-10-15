@@ -576,6 +576,7 @@ class RelayEngine:
                         or chat_id not in json.loads(scope.monitor_chat_ids)
                     ):
                         return
+                copy_options = {}
                 if stage == "dm":
                     if chat_id != current.relay_chat or not self.receives(
                         db, account_id, chat_id
@@ -586,6 +587,9 @@ class RelayEngine:
                     template = current.template.strip() or binding.template
                     if not template.strip():
                         return
+                    copy_options = {} if current.template.strip() else json.loads(binding.copy_options or "{}")
+                    from app.message_copy import validate_copy
+                    validate_copy(db, template, copy_options)
                     text = render_copy(template, username)
                 db.add(
                     RelayJob(
@@ -599,6 +603,7 @@ class RelayEngine:
                         source_title=title,
                         original_text=original,
                         text=text,
+                        copy_options=json.dumps(copy_options),
                     )
                 )
         except IntegrityError:
@@ -797,12 +802,33 @@ class RelayEngine:
                     return
                 if stage == "dm" and not account.private_message_enabled:
                     return
-                job.status = "sending"
                 text = job.text
+                options = json.loads(job.copy_options or "{}") if stage == "dm" else {}
+                entities, image_data = None, None
+                if options:
+                    from app.message_copy import prepare_copy
+                    text, entities, _ = prepare_copy(text, options)
+                    if options.get("image_id"):
+                        from app.relay_models import MessageAsset
+                        asset = db.get(MessageAsset, options["image_id"])
+                        if not asset:
+                            raise ValueError("配图不存在")
+                        image_data = asset.data
+                job.status = "sending"
             # Disable implicit Markdown parsing so user text/mentions stay literal.
-            sent = await asyncio.wait_for(client.send_message(
-                destination, text, parse_mode=None, link_preview=False
-            ), timeout=SEND_TIMEOUT_SECONDS)
+            if image_data:
+                import io
+                photo = io.BytesIO(image_data)
+                photo.name = "message.jpg"
+                sent = await asyncio.wait_for(client.send_file(
+                    destination, photo, caption=text, formatting_entities=entities,
+                    parse_mode=None, force_document=False,
+                ), timeout=SEND_TIMEOUT_SECONDS)
+            else:
+                kwargs = {"formatting_entities": entities} if entities is not None else {}
+                sent = await asyncio.wait_for(client.send_message(
+                    destination, text, parse_mode=None, link_preview=False, **kwargs
+                ), timeout=SEND_TIMEOUT_SECONDS)
             with session_scope() as db:
                 job = db.get(RelayJob, job_id)
                 job.status, job.error = "sent", None

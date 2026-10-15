@@ -44,3 +44,12 @@ def add_task_deletion_marker(engine):
             Operations(MigrationContext.configure(conn)).add_column(
                 "relay_tasks", Column("deleted_at", DateTime(), nullable=True)
             )
+
+
+def add_message_copy_options(engine):
+    from sqlalchemy import Column, Text
+    with engine.begin() as conn:
+        ops = Operations(MigrationContext.configure(conn))
+        for table in ("sender_bindings", "relay_jobs"):
+            if "copy_options" not in {c["name"] for c in inspect(conn).get_columns(table)}:
+                ops.add_column(table, Column("copy_options", Text(), nullable=False, server_default="{}"))

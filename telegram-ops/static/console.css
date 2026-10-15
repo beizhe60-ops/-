@@ -1121,3 +1121,14 @@ dialog:has(.simple-login) {
 
 @media(max-width:760px) { .sidebar nav { flex-wrap:wrap; overflow:visible; } .sidebar nav a { flex:1 0 auto; text-align:center; justify-content:center; } }
 @media(max-width:760px) { #ai-form .form-footer { display:grid; grid-template-columns:1fr 1fr; } #ai-form .form-footer button[type=submit] { grid-column:1 / -1; } }
+
+.copy-composer { margin-top:24px; }
+.copy-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+.copy-editor { min-height:180px; padding:16px; border:1px solid var(--line); border-radius:7px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:16px; line-height:1.7; }
+.copy-editor:focus { outline:2px solid var(--accent); outline-offset:2px; }
+.copy-link-fields,.copy-media { margin:18px 0; padding:16px; background:var(--bg); border-radius:8px; }
+.copy-media img { display:block; max-width:100%; max-height:180px; margin:12px 0; border-radius:6px; }
+.copy-preview-panel { margin-top:16px; max-width:480px; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#f4fff2; }
+.copy-preview-panel img { width:100%; display:block; }
+.copy-preview-text { padding:16px; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.7; }
+#copy-feedback,#copy-upload-status { color:var(--muted); overflow-wrap:anywhere; }

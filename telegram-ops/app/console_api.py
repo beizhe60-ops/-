@@ -22,6 +22,7 @@ from app.relay_models import (
 )
 from app.account_settings import get_profile
 from app.relay_logic import filter_message, format_relay, render_copy
+from app.message_copy import CopyInput, validate_copy
 from app.relay_engine import manager
 from app.workers import send_login_code, verify_login_code, sync_account_chats
 from app.telegram_client import make_client, CONNECT_TIMEOUT_SECONDS
@@ -56,6 +57,7 @@ def account_payload(
     return dict(
         receive_chat_ids=json.loads(binding.chat_ids) if binding else [],
         dm_template=binding.template if binding else "",
+        dm_copy_options=json.loads(binding.copy_options or "{}") if binding else {},
         role=profile.role,
         rotation_weight=weight.weight if weight else 1,
         monitor_chat_ids=json.loads(profile.monitor_chat_ids),
@@ -313,9 +315,8 @@ async def save_weight(id: int, data: WeightInput, db: Session = Depends(get_db))
 GroupID = Annotated[int, Field(strict=True, ge=-(2**52), lt=0)]
 
 
-class ReceiveGroupsInput(BaseModel):
+class ReceiveGroupsInput(CopyInput):
     chat_ids: list[GroupID] = Field(max_length=200)
-    template: str = Field(default="", max_length=DM_TEMPLATE_MAX_LENGTH)
 
     @field_validator("chat_ids")
     @classmethod
@@ -332,9 +333,15 @@ async def receive_groups(
         raise HTTPException(422, "只有私信账号可以绑定接收群组")
     if data.chat_ids and not data.template.strip():
         raise HTTPException(422, "绑定接收群组时请填写私信文案")
+    options = {"format": data.format, "image_id": data.image_id}
+    if data.template.strip() or data.image_id or data.chat_ids:
+        try:
+            validate_copy(db, data.template, options)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
     async with manager.lock:
         old = db.get(SenderBinding, id)
-        template_changed = old is not None and old.template != data.template.strip()
+        template_changed = old is not None and (old.template != data.template.strip() or {"format": "plain", "image_id": None, **json.loads(old.copy_options or "{}")} != options)
         pending = db.query(RelayJob).filter(
             RelayJob.account_id == id,
             RelayJob.stage == "dm",
@@ -348,6 +355,7 @@ async def receive_groups(
                 account_id=id,
                 chat_ids=json.dumps(data.chat_ids),
                 template=data.template.strip(),
+                copy_options=json.dumps(options),
             )
         )
         db.commit()

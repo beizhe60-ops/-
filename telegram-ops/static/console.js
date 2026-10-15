@@ -254,7 +254,7 @@ function accounts() {
               )
               .join("") || '<p class="muted">尚未绑定，不会监测转发。</p>'
           }<button class="secondary small" data-monitor-groups="${a.id}">绑定监测与转发群组</button></div>`
-        : `<div class="monitor-summary"><strong>私信接收群组 ID</strong><div class="chips">${(a.receive_chat_ids || []).map((g) => `<span class="chip">${g}</span>`).join("") || '<p class="muted">尚未绑定，不接收消息、不参与轮询。</p>'}</div><button class="secondary small" data-receive-groups="${a.id}">绑定接收群组</button></div>`
+        : `<div class="monitor-summary"><strong>私信接收群组 ID</strong><div class="chips">${(a.receive_chat_ids || []).map((g) => `<span class="chip">${g}</span>`).join("") || '<p class="muted">尚未绑定，不接收消息、不参与轮询。</p>'}</div><button class="secondary small" data-receive-groups="${a.id}">接收群组与私信文案</button></div>`
     }
     ${!isMonitor ? `<div class="monitor-summary"><strong>轮询权重 <span class="badge">${a.rotation_weight ?? 1}</span></strong><p class="muted">数字越大，分配的私信越多。默认 1。</p><button class="secondary small" data-weight="${a.id}">设置轮询权重</button></div>` : ""}
     <div class="permission-row">${isMonitor ? "允许发送消息" : "允许发送私信"}<input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled ? "checked" : ""}></div>
@@ -473,13 +473,14 @@ function receiveGroupsDialog(id) {
   const a = state.accounts.find((a) => a.id === id);
   openModal(
     "绑定私信接收群组",
-    `<form id="receive-groups-form"><p class="subtle">${E(a.name)} · ${E(a.phone)}</p><label>接收群组 ID<textarea name="chat_ids" rows="4" placeholder="-1001234567890">${E((a.receive_chat_ids || []).join("\n"))}</textarea><small>填写监测账号的转发目标群 ID，每行一个；留空则停止接收。账号需要已加入这些群组。</small></label><label>私信文案<textarea name="template" rows="4" maxlength="3500" placeholder="您好 {{ username }}，这是您咨询的资料。">${E(a.dm_template || "")}</textarea><small>可用 {{ username }} 插入用户名。旧任务如有独立文案，则优先使用任务文案。</small></label><div class="callout">只接收绑定 ID 内、本系统监测账号转发的标准消息。同群内已绑定的私信账号按权重分配。移除 ID 或修改文案会取消受影响的待发送消息。</div><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存接收绑定</button></div></form>`,
+    `<form id="receive-groups-form"><p class="subtle">${E(a.name)} · ${E(a.phone)}</p><label>接收群组 ID<textarea name="chat_ids" rows="4" placeholder="-1001234567890">${E((a.receive_chat_ids || []).join("\n"))}</textarea><small>填写监测账号的转发目标群 ID，每行一个；留空则停止接收。账号需要已加入这些群组。</small></label>${copyEditorMarkup(a)}<p class="subtle">旧任务如有独立文案，仍优先使用任务文案；需要图文时请先在任务编辑中清空旧文案。</p><div class="callout">只接收绑定 ID 内、本系统监测账号转发的标准消息。同群内已绑定的私信账号按权重分配。移除 ID 或修改文案会取消受影响的待发送消息。</div><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存接收绑定</button></div></form>`,
   );
+  const copyValue = bindCopyEditor(a);
   setupForm("#receive-groups-form", async (fd) => {
-    const chat_ids = parseGroupIds(fd.get("chat_ids"), true),
-      template = fd.get("template").trim();
-    if (chat_ids.length && !template) throw Error("请填写私信文案");
-    await api(`/accounts/${id}/receive-groups`, "PUT", { chat_ids, template });
+    const chat_ids = parseGroupIds(fd.get("chat_ids"), true);
+    const copy = copyValue();
+    if (chat_ids.length && !$("#copy-editor").textContent.trim()) throw Error("请填写私信文案");
+    await api(`/accounts/${id}/receive-groups`, "PUT", { chat_ids, ...copy });
     $("#modal").close();
     await load();
     toast("接收群组与私信文案已保存");
