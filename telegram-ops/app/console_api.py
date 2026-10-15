@@ -610,6 +610,12 @@ async def sync(id: int, db: Session = Depends(get_db)):
     return {"ok": True, "message": f"已同步 {count} 个群组或频道"}
 
 
+@router.get("/api/accounts/{id}/listener")
+def listener_diagnostics(id: int, db: Session = Depends(get_db)):
+    required(db, Account, id)
+    return manager.listener_status(id)
+
+
 @router.post("/api/accounts/{id}/logout")
 async def logout_account(id: int, db: Session = Depends(get_db)):
     required(db, Account, id)

@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import json
 import logging
+from collections import deque
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -52,6 +53,22 @@ class RelayEngine:
         self.lifecycle_lock = asyncio.Lock()
         self.last_send_account = 0
         self.last_connection_account = 0
+        self.listener_diagnostics = {}
+
+    def note_message(self, account_id, event, outcome, task_id=None):
+        """Bounded metadata only: no message text, usernames or login secrets."""
+        rows = self.listener_diagnostics.setdefault(account_id, deque(maxlen=100))
+        rows.append(dict(at=datetime.utcnow().isoformat() + "Z", chat_id=event.chat_id,
+                         message_id=event.id, task_id=task_id, outcome=outcome))
+
+    def listener_status(self, account_id):
+        worker = self.workers.get(account_id)
+        client = worker.client if worker else None
+        # Telethon's transport connection alone does not prove its update task is alive.
+        update_task = getattr(client, "_updates_handle", None)
+        return dict(connected=bool(client and client.is_connected()),
+                    update_loop_running=not update_task.done() if update_task else None,
+                    events=list(self.listener_diagnostics.get(account_id, [])))
 
     def account_lock(self, account_id):
         return self.account_locks.setdefault(account_id, asyncio.Lock())
@@ -198,6 +215,7 @@ class RelayEngine:
                     try:
                         await self.on_message(account_id, event)
                     except Exception:
+                        self.note_message(account_id, event, "handler_error")
                         log.exception("Message handler failed for account %s", account_id)
 
                 client.add_event_handler(receive, events.NewMessage())
@@ -361,6 +379,7 @@ class RelayEngine:
             return {"sent": True, "message_count": len(payload), "target_id": target}
 
     async def on_message(self, account_id, event):
+        self.note_message(account_id, event, "received")
         if not self.running or not (event.is_group or event.is_channel):
             return
         text = event.raw_text or ""
@@ -408,21 +427,26 @@ class RelayEngine:
                 and int(event.chat_id) in json.loads(task.source_chats)
                 and not event.out
             ):
+                self.note_message(account_id, event, "resolving_sender", task.id)
                 sender = await event.get_sender()
                 if (
                     not isinstance(sender, User)
                     or sender.id in self.identities.values()
                 ):
+                    self.note_message(account_id, event, "own_account_or_non_user", task.id)
                     continue
                 username = sender.username or ""
                 ok, reason = filter_message(task, text, username, sender.id, sender.bot)
                 if not ok:
+                    self.note_message(account_id, event, reason.split("：")[0], task.id)
                     continue
+                self.note_message(account_id, event, "matched", task.id)
                 chat = await event.get_chat()
                 title = getattr(chat, "title", str(event.chat_id))
                 try:
                     formatted = format_relay(title, text, username)
                 except ValueError:
+                    self.note_message(account_id, event, "message_too_long", task.id)
                     continue
                 self.enqueue(
                     task,

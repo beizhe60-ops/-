@@ -513,3 +513,16 @@ def test_keyword_separators_and_modes(separator):
     t.exclude_keywords = separator.join(['广告', '推广'])
     assert not filter_message(t, '盒马推广', 'target_user')[0]
     assert not filter_message(t, '携程广告', 'target_user')[0]
+
+
+def test_listener_diagnostics_bounded_and_private():
+    seed()
+    e = engine()
+    ev = event(-1001, User(id=999, username='target_user'), '咨询 private-body')
+    asyncio.run(e.on_message(1, ev))
+    status = e.listener_status(1)
+    assert status['connected']
+    assert [r['outcome'] for r in status['events']] == ['received', 'resolving_sender', 'matched']
+    assert 'private-body' not in str(status) and 'target_user' not in str(status)
+    for _ in range(120): e.note_message(1, ev, 'received')
+    assert len(e.listener_status(1)['events']) == 100
