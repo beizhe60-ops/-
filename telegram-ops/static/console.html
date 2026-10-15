@@ -4,8 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Telegram Ops · 消息工作台</title>
-    <link rel="stylesheet" href="/static/console.css" />
-    <script defer src="/static/console.js?v=20261011-ai-workspace"></script>
+    <link rel="stylesheet" href="/static/console.css?v=20261015-workflows" />
+    <script defer src="/static/workspace.js?v=20261015-workflows"></script>
+    <script defer src="/static/console.js?v=20261015-workflows"></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -15,14 +16,15 @@
       >
       <div class="nav-label">工作空间</div>
       <nav aria-label="主导航">
-        <a href="/console" data-page="overview"><span>◫</span>运行概览</a
+        <a href="/console" data-page="overview"><span>◫</span>工作台</a
         ><a href="/console/accounts" data-page="accounts"
           ><span>◎</span>账号管理</a
-        ><a href="/console/tasks" data-page="tasks"><span>⇄</span>任务与过滤</a
+        ><a href="/console/broadcasts" data-page="broadcasts"><span>↗</span>群发任务</a
+        ><a href="/console/tasks" data-page="tasks"><span>⇄</span>监测转发</a
+        ><a href="/console/ai" data-page="ai"><span>✦</span>AI 群组分析</a
         ><a href="/console/records" data-page="records"
-          ><span>≡</span>消息记录</a
+          ><span>≡</span>转发与私信记录</a
         ><a href="/console/guards" data-page="guards"><span>⊘</span>不再联系</a
-        ><a href="/console/ai" data-page="ai"><span>✦</span>AI 分析</a
         ><a href="/console/settings" data-page="settings" class="mobile-only"
           >系统设置</a
         ><a href="/admin/logout" class="mobile-only">退出</a>
@@ -39,7 +41,7 @@
     <div class="workspace">
       <header class="topbar">
         <span class="breadcrumb"
-          >工作空间 <span>/</span> <b id="crumb">运行概览</b></span
+          >工作空间 <span>/</span> <b id="crumb">工作台</b></span
         >
         <div class="toolbar">
           <span id="service-badge" class="badge">加载中</span

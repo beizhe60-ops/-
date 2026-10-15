@@ -59,6 +59,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
 app.include_router(console_router)
+from app.broadcast import router as broadcast_router
+app.include_router(broadcast_router)
 
 
 PUBLIC_PATH_PREFIXES = ("/static", "/admin/login", "/favicon.ico")

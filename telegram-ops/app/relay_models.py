@@ -104,3 +104,38 @@ class AiSummaryMessage(Base):
     sender_name: Mapped[str] = mapped_column(String(255), default="")
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class BroadcastTask(Base, TimestampMixin):
+    __tablename__ = "broadcast_tasks"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    request_key: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
+    targets: Mapped[str] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="draft", index=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class BroadcastDelivery(Base):
+    __tablename__ = "broadcast_deliveries"
+    __table_args__ = (UniqueConstraint("task_id", "chat_id", name="uq_broadcast_target"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("broadcast_tasks.id"), index=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger)
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    due_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sent_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class AiSummaryRun(Base):
+    __tablename__ = "ai_summary_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    status: Mapped[str] = mapped_column(String(24))
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    detail: Mapped[str] = mapped_column(Text, default="")

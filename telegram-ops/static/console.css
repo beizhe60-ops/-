@@ -1092,3 +1092,32 @@ dialog:has(.simple-login) {
   margin-bottom: 14px;
   overflow-wrap: anywhere;
 }
+
+/* Task-oriented navigation and progressive setup. */
+[hidden] { display: none !important; }
+.workflow-menu { border-top: 1px solid var(--line); margin-bottom: 28px; }
+.workflow-entry { display:flex; align-items:center; gap:24px; padding:28px 20px; color:var(--ink); border-bottom:1px solid var(--line); background:var(--paper); }
+.workflow-entry:hover { background:var(--accent-light); }
+.workflow-entry > div { flex:1; }
+.workflow-entry h2 { margin:0 0 8px; font-size:21px; }
+.workflow-entry p { margin:0 0 8px; }
+.workflow-entry small { color:var(--muted); }
+.workflow-icon { color:var(--accent); font-size:30px; width:40px; text-align:center; }
+.group-picker { min-width:0; margin:18px 0; padding:16px; border:1px solid var(--line); border-radius:8px; }
+.group-picker legend { font-weight:600; padding:0 6px; }
+.group-picker .actions input { flex:1; min-width:120px; }
+.group-options { max-height:220px; overflow:auto; margin:12px 0; }
+.group-option { display:flex; align-items:center; gap:12px; padding:10px; margin:0; border-bottom:1px solid var(--line); cursor:pointer; }
+.group-option input { width:auto; margin:0; }
+.group-option span { overflow-wrap:anywhere; }
+.group-option small { display:block; color:var(--muted); margin-top:3px; }
+.group-picker details { margin:12px 0; }
+.group-picker summary, .connection-settings summary { cursor:pointer; color:var(--accent); padding:8px 0; }
+.connection-settings { padding:16px 0; margin:20px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.summary-status { display:flex; flex-wrap:wrap; gap:12px 32px; background:var(--accent-light); padding:16px; border-radius:6px; }
+.task-row > div { min-width:0; overflow-wrap:anywhere; }
+#ai-run-result, #ai-test-result { white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:700px) { .workflow-entry { gap:12px; padding:22px 12px; } .workflow-entry h2{font-size:18px;} .group-picker{padding:10px;} .summary-status{display:grid;} .task-row .actions{flex-wrap:wrap;} }
+
+@media(max-width:760px) { .sidebar nav { flex-wrap:wrap; overflow:visible; } .sidebar nav a { flex:1 0 auto; text-align:center; justify-content:center; } }
+@media(max-width:760px) { #ai-form .form-footer { display:grid; grid-template-columns:1fr 1fr; } #ai-form .form-footer button[type=submit] { grid-column:1 / -1; } }

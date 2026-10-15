@@ -32,6 +32,10 @@ log = logging.getLogger(__name__)
 MAX_ACCOUNT_OPERATIONS = 4
 
 
+class SummaryDeliveryError(ValueError):
+    """Delivery failure already recorded with its certainty state."""
+
+
 class RelayEngine:
     def __init__(self):
         self.running = False
@@ -39,6 +43,7 @@ class RelayEngine:
         self.identities = {}
         self.loop_task = None
         self.ai_task = None
+        self.broadcast_task = None
         self.ai_run_lock = asyncio.Lock()
         self.lock = asyncio.Lock()
         self.account_locks = {}
@@ -60,7 +65,10 @@ class RelayEngine:
                 db.query(RelayJob).filter(RelayJob.status == "sending").update(
                     {"status": "unknown", "error": "服务中断，发送结果不确定；不会自动重发"}
                 )
+            from app.broadcast import recover_broadcasts, broadcast_loop
+            recover_broadcasts()
             self.running = True
+            self.broadcast_task = asyncio.create_task(broadcast_loop(self))
             self.loop_task = asyncio.create_task(self.run())
             self.ai_task = asyncio.create_task(self.ai_summary_loop())
 
@@ -70,6 +78,8 @@ class RelayEngine:
             tasks = list(self.send_tasks.values()) + list(self.connection_tasks.values())
             if self.loop_task:
                 tasks.append(self.loop_task)
+            if self.broadcast_task:
+                tasks.append(self.broadcast_task)
             if self.ai_task:
                 tasks.append(self.ai_task)
             for task in tasks:
@@ -229,10 +239,23 @@ class RelayEngine:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                log.exception("AI summary iteration failed")
+                log.warning("AI summary failed; see summary run history")
+                await asyncio.sleep(270)
             await asyncio.sleep(30)
 
-    async def generate_ai_summary(self, force=False):
+    async def generate_ai_summary(self, force=False, preview=False):
+        from app.relay_models import AiSummaryRun
+        try:
+            return await self._generate_ai_summary(force=force, preview=preview)
+        except (asyncio.CancelledError, SummaryDeliveryError):
+            raise
+        except Exception as exc:
+            detail = str(exc) if isinstance(exc, ValueError) else "摘要处理失败：" + type(exc).__name__
+            with session_scope() as db:
+                db.add(AiSummaryRun(status="failed", detail=detail[:500]))
+            raise ValueError(detail) from exc
+
+    async def _generate_ai_summary(self, force=False, preview=False):
         """Generate and send one summary through the configured monitor account."""
         async with self.ai_run_lock:
             with session_scope() as db:
@@ -246,6 +269,8 @@ class RelayEngine:
                 last = db.get(ConsoleState, "ai_summary_last_run")
                 last_key = last.value if last else ""
                 trigger = config.get("trigger", "schedule")
+                if not force and trigger == "manual":
+                    return {"sent": False, "reason": "仅手动生成"}
                 run_key = now_local.strftime("%Y-%m-%d")
                 if not force and trigger == "schedule":
                     if now_local.strftime("%H:%M") != config.get("schedule_time", "23:00") or last_key == run_key:
@@ -256,11 +281,12 @@ class RelayEngine:
                         since = max(since, datetime.fromisoformat(last_key))
                     except ValueError:
                         pass
-                query = db.query(AiSummaryMessage).filter(AiSummaryMessage.created_at >= since)
+                snapshot_at = datetime.utcnow()
+                query = db.query(AiSummaryMessage).filter(AiSummaryMessage.created_at <= snapshot_at, AiSummaryMessage.created_at >= since, AiSummaryMessage.account_id == int(config["account_id"]), AiSummaryMessage.chat_id.in_(config.get("source_chat_ids", [])))
                 messages = query.order_by(AiSummaryMessage.created_at.desc()).limit(int(config.get("message_count", 50))).all()
                 if not messages:
                     return {"sent": False, "reason": "当前时间范围没有可摘要消息"}
-                if not force and trigger == "count" and len(messages) < int(config.get("message_count", 50)):
+                if not force and trigger == "count" and query.count() < int(config.get("trigger_count", config.get("message_count", 50))):
                     return {"sent": False, "reason": "尚未达到摘要条数"}
                 account = db.get(Account, int(config["account_id"]))
                 if not account or not account.session_string_encrypted:
@@ -282,13 +308,54 @@ class RelayEngine:
                 api_url = config["api_url"]
                 model = config["model"]
             worker = self.workers.get(account_id)
-            if not worker or not worker.client.is_connected():
+            if not preview and (not worker or not worker.client.is_connected()):
                 raise ValueError("AI 推送账号当前未连接，请先启动服务")
             summary = await asyncio.to_thread(request_summary, api_url, api_key, model, payload)
-            header = "📊 群组 AI 摘要\n\n"
-            await worker.client.send_message(target, header + summary)
+            from app.relay_models import AiSummaryRun
+            if preview:
+                with session_scope() as db:
+                    db.add(AiSummaryRun(status="preview", message_count=len(payload), detail="预览已生成，未推送"))
+                return {"sent": False, "preview": summary, "message_count": len(payload)}
+            async with self.account_lock(account_id):
+                with session_scope() as db:
+                    latest = db.get(ConsoleState, "ai_summary_settings")
+                    current = db.get(Account, account_id)
+                    if not latest or json.loads(latest.value) != config:
+                        raise ValueError("配置已变更，本次推送已停止，请重新生成")
+                    worker = self.workers.get(account_id)
+                    if not self.running or not current or not current.send_enabled or not current.session_string_encrypted or not worker or not worker.client.is_connected():
+                        raise ValueError("服务或账号发送权限已暂停")
+                    if current.flood_wait_until and current.flood_wait_until > datetime.utcnow():
+                        raise ValueError("Telegram 要求等待，请稍后推送")
+                    attempt = AiSummaryRun(status="unknown", message_count=len(payload), target_id=target, detail="发送结果待核实；不会自动重发")
+                    db.add(attempt)
+                    db.flush()
+                    attempt_id = attempt.id
+                    # Reserve before the external send so a crash does not blindly resend.
+                    db.merge(ConsoleState(key="ai_summary_last_run", value=run_key if trigger == "schedule" else snapshot_at.isoformat()))
+                try:
+                    await asyncio.wait_for(worker.client.send_message(target, "📊 群组 AI 摘要\n\n" + summary, parse_mode=None), SEND_TIMEOUT_SECONDS)
+                except FloodWaitError as exc:
+                    with session_scope() as db:
+                        db.get(Account, account_id).flood_wait_until = datetime.utcnow() + timedelta(seconds=exc.seconds)
+                        db.get(Account, account_id).status = "flood_wait"
+                        failed = db.get(AiSummaryRun, attempt_id)
+                        failed.status, failed.detail = "failed", f"Telegram 要求等待 {exc.seconds} 秒；本次未推送"
+                    raise SummaryDeliveryError(f"Telegram 要求等待 {exc.seconds} 秒，请稍后推送") from exc
+                except RPCError as exc:
+                    detail = "Telegram 拒绝推送：" + type(exc).__name__
+                    with session_scope() as db:
+                        failed = db.get(AiSummaryRun, attempt_id)
+                        failed.status, failed.detail = "failed", detail
+                    raise SummaryDeliveryError(detail) from exc
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    raise SummaryDeliveryError("推送结果待核实，请检查接收端和运行记录后再操作") from exc
+                with session_scope() as db:
+                    done = db.get(AiSummaryRun, attempt_id)
+                    done.status, done.detail = "sent", "摘要推送成功"
             with session_scope() as db:
-                db.merge(ConsoleState(key="ai_summary_last_run", value=run_key if trigger == "schedule" else datetime.utcnow().isoformat()))
                 cutoff = datetime.utcnow() - timedelta(days=14)
                 db.query(AiSummaryMessage).filter(AiSummaryMessage.created_at < cutoff).delete()
             return {"sent": True, "message_count": len(payload), "target_id": target}
@@ -312,7 +379,7 @@ class RelayEngine:
             ai_row = db.get(ConsoleState, "ai_summary_settings")
             ai_config = json.loads(ai_row.value) if ai_row else {}
             ai_source_ids = set(ai_config.get("source_chat_ids", []))
-        if profile and profile.role == "monitor" and int(event.chat_id) in ai_source_ids and not event.out:
+        if profile and profile.role == "monitor" and account_id == ai_config.get("account_id") and int(event.chat_id) in ai_source_ids and not event.out:
             chat = await event.get_chat()
             sender = await event.get_sender()
             sender_name = getattr(sender, "username", None) or getattr(sender, "first_name", None) or getattr(sender, "title", None) or str(event.sender_id or "")

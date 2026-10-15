@@ -25,12 +25,13 @@ let renderRevision = 0;
 let pollFailed = false;
 const READ_TIMEOUT_MS = 30000;
 const titles = {
-  overview: "运行概览",
+  overview: "工作台",
   accounts: "账号管理",
-  tasks: "任务与过滤",
+  tasks: "监测转发",
   records: "消息记录",
   guards: "不再联系",
-  ai: "AI 分析",
+  ai: "AI 群组分析",
+  broadcasts: "群发任务",
   settings: "系统设置",
 };
 const labels = {
@@ -223,56 +224,7 @@ function tasksList() {
         "<button data-new-task>新建任务</button>",
       );
 }
-function overview() {
-  const s = state.stats;
-  return (
-    heading(
-      "消息流转，一目了然",
-      "从群内发言到私信跟进，在一个工作台里管理。",
-      '<a class="button" href="/console/tasks">＋ 新建消息任务</a>',
-    ) +
-    flow() +
-    `<div class="metrics">${[
-      ["今日关键词命中", s.hits, "A 账号捕获的消息"],
-      ["等待发送", s.pending, "含平台要求等待的消息"],
-      ["今日私信成功", s.sent, "B 账号发送成功"],
-      ["需要关注", s.failed, "失败或结果不确定"],
-    ]
-      .map(
-        ([a, b, c]) =>
-          `<div class="metric"><p>${a}</p><b>${b}</b><small>${c}</small></div>`,
-      )
-      .join(
-        "",
-      )}</div><div class="columns"><section class="panel"><div class="panel-head"><h2>消息任务</h2><a href="/console/tasks">管理全部</a></div>${tasksList()}</section><section class="panel"><div class="panel-head"><h2>开始使用</h2><span class="subtle">${[state.accounts.some((a) => a.role === "monitor" && a.has_session), state.tasks.length > 0, state.tasks.some((t) => t.enabled)].filter(Boolean).length} / 3</span></div><div class="panel-body"><ol class="checklist">${[
-      [
-        "登录监测账号",
-        "需要自动私信时，再登录私信账号。",
-        state.accounts.some((a) => a.role === "monitor" && a.has_session),
-        "accounts",
-      ],
-      [
-        "绑定功能群组 ID",
-        "监测转发与私信接收分别绑定。",
-        state.tasks.length > 0,
-        "accounts",
-      ],
-      [
-        "配置并启用任务",
-        "核对群组 ID 和关键词，再启动服务。",
-        state.tasks.some((t) => t.enabled),
-        "tasks",
-      ],
-    ]
-      .map(
-        ([a, b, c, d], i) =>
-          `<li><span class="check-number ${c ? "done" : ""}">${c ? "✓" : i + 1}</span><div><a href="/console/${d}">${a}</a><p>${b}</p></div></li>`,
-      )
-      .join(
-        "",
-      )}</ol></div></section></div><div class="callout">启动服务后只监听新消息；模拟测试不会向 Telegram 发送消息。统计日期按服务器 UTC 计算。</div>`
-  );
-}
+function overview() { return workspaceHome(); }
 function accounts() {
   const isMonitor = accountTab === "monitor";
   const items = state.accounts.filter((a) => a.role === accountTab);
@@ -305,8 +257,8 @@ function accounts() {
         : `<div class="monitor-summary"><strong>私信接收群组 ID</strong><div class="chips">${(a.receive_chat_ids || []).map((g) => `<span class="chip">${g}</span>`).join("") || '<p class="muted">尚未绑定，不接收消息、不参与轮询。</p>'}</div><button class="secondary small" data-receive-groups="${a.id}">绑定接收群组</button></div>`
     }
     ${!isMonitor ? `<div class="monitor-summary"><strong>轮询权重 <span class="badge">${a.rotation_weight ?? 1}</span></strong><p class="muted">数字越大，分配的私信越多。默认 1。</p><button class="secondary small" data-weight="${a.id}">设置轮询权重</button></div>` : ""}
-    <div class="permission-row">${isMonitor ? "允许转发消息" : "允许发送私信"}<input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled ? "checked" : ""}></div>
-    ${a.last_error ? `<p class="error-text">${E(a.last_error)}</p>` : ""}<div class="actions">${!a.has_session ? `<button class="small" data-login="${a.id}">继续登录</button>` : `<button class="secondary small" data-sync="${a.id}">同步群名称（可选）</button><button class="text-button small" data-logout-account="${a.id}">退出账号</button>`}</div></article>`,
+    <div class="permission-row">${isMonitor ? "允许发送消息" : "允许发送私信"}<input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled ? "checked" : ""}></div>
+    ${a.last_error ? `<p class="error-text">${E(a.last_error)}</p>` : ""}<div class="actions">${!a.has_session ? `<button class="small" data-login="${a.id}">继续登录</button>` : `<button class="secondary small" data-sync="${a.id}">更新群组列表</button><button class="text-button small" data-logout-account="${a.id}">退出账号</button>`}</div></article>`,
           )
           .join("")}</div>`
       : `<div class="panel">${empty("还没有" + roleName, "使用手机号、验证码和二级登录密码完成登录。", `<button id="empty-add-account">${roleName}登录</button>`)}</div>`)
@@ -316,7 +268,7 @@ function accounts() {
 function tasks() {
   return (
     heading(
-      "任务与过滤",
+      "监测转发",
       "每条绑定指定监测来源群 ID、转发目标群 ID 与过滤规则。私信账号另行绑定接收群 ID。",
       '<div class="actions"><button class="secondary" id="standalone-preview">模拟测试</button><button data-new-task>＋ 新建任务</button></div>',
     ) +
@@ -357,13 +309,7 @@ async function guards() {
     `<section class="panel">${items.length ? `<div class="table-wrap"><table><thead><tr><th>用户 ID</th><th>备注</th><th>操作</th></tr></thead><tbody>${items.map((g) => `<tr><td>${g.user_id}</td><td>${E(g.note || "—")}</td><td><button class="secondary small" data-remove-guard="${g.id}">移出名单</button></td></tr>`).join("")}</tbody></table></div>` : empty("名单为空", "可以从消息记录添加用户，也可以在这里输入 Telegram 用户 ID。")}</section>`
   );
 }
-async function ai() {
-  const ai = await api("/ai/settings");
-  const monitors = state.accounts.filter((a) => a.role === "monitor" && a.has_session);
-  const aiAccountOptions = monitors.map((a) => `<option value="${a.id}" ${ai.account_id === a.id ? "selected" : ""}>${E(a.name)} · ${E(a.phone)}</option>`).join("");
-  return heading("AI 分析", "独立配置分析群组、摘要规则和绑定账号推送。") +
-    `<section class="panel"><div class="panel-head"><h2>AI 摘要推送</h2>${badge(ai.enabled ? "active" : "disabled", ai.enabled ? "已启用" : (ai.configured ? "已暂停" : "待配置"))}</div><div class="panel-body"><p class="subtle">AI 分析群组与转发任务独立配置。分析群组只负责收集消息，不需要关键词；摘要由选定的绑定账号发送到群组或私人账号。API Key 只保存加密结果。</p><form id="ai-form"><div class="form-grid" style="margin-top:20px"><label class="span-2">AI 分析群组 ID<textarea name="source_chat_ids" rows="3" required placeholder="-1001234567890\n-1009876543210">${E((ai.source_chat_ids || []).join("\\n"))}</textarea><small>每行一个完整负数 ID。只有这些群组进入 AI 分析，不受下方“任务与过滤”的关键词影响。</small></label><label>推送账号<select name="account_id" required>${aiAccountOptions || '<option value="">请先登录监测账号</option>'}</select><small>只能选择已登录的监测账号。</small></label><label class="checkbox-label"><input type="checkbox" name="enabled" ${ai.enabled ? "checked" : ""}>启用自动摘要</label><label>AI 接口地址<input name="api_url" value="${E(ai.api_url || "https://api.openai.com/v1/chat/completions")}" required></label><label>模型<input name="model" value="${E(ai.model || "gpt-4o-mini")}" required></label><label>API Key<input type="password" name="api_key" placeholder="${ai.api_key_configured ? "已保存，留空保持不变" : "请输入 API Key"}" autocomplete="new-password" ${ai.api_key_configured ? "" : "required"}></label><label>摘要触发方式<select name="trigger"><option value="schedule" ${ai.trigger === "schedule" ? "selected" : ""}>每日定时</option><option value="count" ${ai.trigger === "count" ? "selected" : ""}>达到消息条数</option><option value="manual" ${ai.trigger === "manual" ? "selected" : ""}>仅手动触发</option></select></label><label>推送目标类型<select name="target_type"><option value="group" ${ai.target_type !== "private" ? "selected" : ""}>群组</option><option value="private" ${ai.target_type === "private" ? "selected" : ""}>私人账号</option></select></label><label>推送目标 ID<input name="target_id" type="number" value="${E(ai.target_id || "")}" required><small>群组填写负数（通常 -100 开头）；私人账号填写正数。</small></label><label>每日推送时间<input name="schedule_time" type="time" value="${E(ai.schedule_time || "23:00")}" required></label><label>摘要消息条数<input name="message_count" type="number" min="1" max="1000" value="${E(ai.message_count || 50)}" required></label><label>统计时间范围（小时）<input name="lookback_hours" type="number" min="1" max="168" value="${E(ai.lookback_hours || 24)}" required></label></div><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">保存 AI 配置</button><button type="button" class="secondary" id="run-ai-summary" ${!ai.configured ? "disabled" : ""}>立即生成并推送</button></div></form></div></section>`;
-}
+async function ai() { return workspaceAi(); }
 function settings() {
   return (
     heading("系统设置", "控制后台运行和管理访问凭据。") +
@@ -381,7 +327,7 @@ async function render({ background = false, revision = ++renderRevision } = {}) 
   let html;
   try {
     html = await (
-      { overview, accounts, tasks, records, guards, ai, settings }[page] || overview
+      { overview, accounts, tasks, records, guards, ai, broadcasts, settings }[page] || overview
     )();
   } catch (e) {
     if (revision !== renderRevision) return;
@@ -498,8 +444,7 @@ function loginDialog(id, role = accountTab) {
     toast(
       role === "monitor" ? "登录成功，请设置监测群组 ID" : "私信账号登录成功",
     );
-    if (role === "monitor") monitorGroupsDialog(accountId);
-    else receiveGroupsDialog(accountId);
+    toast("账号已登录，请从左侧选择群发、监测转发或 AI 群组分析");
   });
 }
 function monitorGroupsDialog(id) {
@@ -569,17 +514,19 @@ function taskDialog(id, monitorId) {
     `<form id="task-form">
     <label>绑定名称<input name="name" value="${E(t.name)}" required maxlength="120" placeholder="例如：产品咨询监测"></label>
     <div class="form-grid" style="margin-top:20px"><label class="span-2">监测账号<select name="account_a">${options}</select></label>
-    <label>监测群组 ID<textarea name="source_chats" rows="4" required placeholder="-1001234567890\n-1009876543210">${E(t.source_chats.join("\n"))}</textarea><small>每行一个完整 ID；只有这些来源群进入筛选。</small></label>
-    <label>转发目标群组 ID（支持私有群）<input name="relay_chat" value="${E(t.relay_chat ?? "")}" placeholder="可暂时留空"><small>填写私有群或公开群的完整数字 ID，不填邀请链接或 @用户名。可暂时留空保存，补填后才能启用。</small></label></div>
+    <div><strong>来源群</strong>${groupPicker("source_chats",t.account_a,t.source_chats)}</div>
+    <div><strong>转发目标群</strong>${groupPicker("relay_chat",t.account_a,t.relay_chat?[t.relay_chat]:[],true)}<small>转发目标可暂时留空，补齐后再启用。</small></div></div>
     <div class="callout">私有群无需改成公开群。所选监测账号须已加入来源群和转发目标群，并拥有目标群发言权限；仅填写 ID 不会自动加入群组。不需要先配置私信账号。</div>
     <div class="form-section"><div class="section-title">消息过滤</div><div class="form-grid"><label>匹配方式<select name="match_mode"><option value="any" ${t.match_mode === "any" ? "selected" : ""}>包含任意关键词</option><option value="all" ${t.match_mode === "all" ? "selected" : ""}>包含全部关键词</option><option value="exact" ${t.match_mode === "exact" ? "selected" : ""}>整条发言精确匹配</option></select></label><label>忽略用户<input name="ignore_users" value="${E(t.ignore_users)}" placeholder="@用户名或用户 ID，用逗号分隔"></label><label>包含关键词<textarea name="keywords" required placeholder="例如：携程 卡密 大润发 盒马">${E(t.keywords)}</textarea><small>用空格分隔关键词，也支持换行、逗号。</small></label><label>排除关键词<textarea name="exclude_keywords">${E(t.exclude_keywords)}</textarea><small>用空格分隔排除词，命中任意一个即排除；也支持换行、逗号。</small></label></div></div>
     <p class="preview-label">固定转发格式</p><div class="preview-box">群组-该用户发言的内容-@用户名</div>
     ${t.template ? `<details class="simulation"><summary>原任务私信文案（兼容已有配置）</summary><label>任务独立文案<textarea name="template" maxlength="3500">${E(t.template)}</textarea><small>清空后使用私信账号设置的文案。</small></label></details>` : ""}
     <details class="simulation"><summary>模拟测试过滤与消息格式（不会发送）</summary>${previewFields()}</details><div class="form-error" role="alert"></div><div class="form-footer"><button type="submit">${id ? "保存更改并暂停" : "保存绑定（暂停）"}</button></div></form>`,
   );
+  bindPicker($('[data-picker=source_chats]'), '#task-form [name=account_a]');
+  bindPicker($('[data-picker=relay_chat]'), '#task-form [name=account_a]');
   $("#run-preview").onclick = () => runPreview($("#task-form"));
   setupForm("#task-form", async (fd) => {
-    const data = Object.fromEntries(fd);
+    const data = Object.fromEntries([...fd].filter(([key]) => !key.startsWith("pick-")));
     data.account_a = Number(fd.get("account_a"));
     data.source_chats = parseGroupIds(fd.get("source_chats"));
     const target = parseGroupIds(fd.get("relay_chat"), true);
@@ -781,37 +728,7 @@ function bindPage() {
           );
       }),
   );
-  if ($("#ai-form"))
-    setupForm("#ai-form", async (fd) => {
-      await api("/ai/settings", "PUT", {
-        enabled: fd.get("enabled") === "on",
-        account_id: Number(fd.get("account_id")),
-        source_chat_ids: parseGroupIds(fd.get("source_chat_ids")),
-        api_url: fd.get("api_url").trim(),
-        api_key: fd.get("api_key"),
-        model: fd.get("model").trim(),
-        trigger: fd.get("trigger"),
-        target_type: fd.get("target_type"),
-        target_id: Number(fd.get("target_id")),
-        schedule_time: fd.get("schedule_time"),
-        message_count: Number(fd.get("message_count")),
-        lookback_hours: Number(fd.get("lookback_hours")),
-      });
-      await load();
-      toast("AI 摘要配置已保存");
-    });
-  if ($("#run-ai-summary"))
-    $("#run-ai-summary").onclick = async (e) => {
-      e.currentTarget.disabled = true;
-      try {
-        const result = await api("/ai/run", "POST");
-        toast(result.sent ? `已推送摘要（${result.message_count} 条消息）` : result.reason);
-      } catch (ex) {
-        toast(ex.message);
-      } finally {
-        e.currentTarget.disabled = false;
-      }
-    };
+  bindWorkspace();
   if ($("#password-form"))
     setupForm("#password-form", async (fd) => {
       await api("/password", "POST", Object.fromEntries(fd));

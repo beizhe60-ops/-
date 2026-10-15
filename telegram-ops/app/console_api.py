@@ -16,6 +16,7 @@ from app.relay_models import (
     SenderWeight,
     SenderBinding,
     AiSummaryMessage,
+    AiSummaryRun,
 )
 from app.account_settings import get_profile
 from app.relay_logic import filter_message, format_relay, render_copy
@@ -118,7 +119,7 @@ class ApplicationInput(BaseModel):
 class AiSummaryInput(BaseModel):
     enabled: bool = False
     account_id: int = Field(gt=0)
-    source_chat_ids: list[int] = Field(default_factory=list, max_length=200)
+    source_chat_ids: list[Annotated[int, Field(strict=True)]] = Field(default_factory=list, max_length=200)
     api_url: str = Field(default="https://api.openai.com/v1/chat/completions", min_length=8, max_length=500)
     api_key: str = Field(default="", max_length=512)
     model: str = Field(default="gpt-4o-mini", min_length=1, max_length=120)
@@ -127,6 +128,7 @@ class AiSummaryInput(BaseModel):
     target_id: int = Field(strict=True, ne=0, ge=-(2**52), le=2**52)
     schedule_time: str = Field(default="23:00", pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
     message_count: int = Field(default=50, ge=1, le=1000)
+    trigger_count: int = Field(default=50, ge=1, le=1000)
     lookback_hours: int = Field(default=24, ge=1, le=168)
 
     @field_validator("source_chat_ids")
@@ -158,6 +160,7 @@ def ai_settings_payload(db):
         "target_id": value.get("target_id"),
         "schedule_time": value.get("schedule_time"),
         "message_count": value.get("message_count"),
+        "trigger_count": value.get("trigger_count", value.get("message_count", 50)),
         "lookback_hours": value.get("lookback_hours"),
         "api_key_configured": bool(value.get("api_key_encrypted")),
     }
@@ -182,6 +185,11 @@ def save_ai_settings(data: AiSummaryInput, db: Session = Depends(get_db)):
         raise HTTPException(422, "群组目标 ID 必须是负数")
     if data.target_type == "private" and data.target_id <= 0:
         raise HTTPException(422, "私人目标 ID 必须是正数")
+    from urllib.parse import urlparse
+    if urlparse(data.api_url).scheme != "https" or not urlparse(data.api_url).hostname or urlparse(data.api_url).username or urlparse(data.api_url).password:
+        raise HTTPException(422, "AI 接口请填写完整 HTTPS 地址")
+    if existing and urlparse(data.api_url).netloc != urlparse(existing.get("api_url", "")).netloc and not data.api_key.strip():
+        raise HTTPException(422, "更换服务商时请填写对应 API Key")
     payload = data.model_dump(exclude={"api_key"})
     payload["api_key_encrypted"] = (
         encrypt_text(data.api_key.strip()) if data.api_key.strip() else existing["api_key_encrypted"]
@@ -198,6 +206,70 @@ async def run_ai_summary():
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     return result
+
+
+@router.post("/api/ai/preview")
+async def preview_ai_summary():
+    try:
+        return await manager.generate_ai_summary(force=True, preview=True)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+class AiConnectionInput(BaseModel):
+    api_url: str = Field(min_length=8, max_length=500)
+    model: str = Field(min_length=1, max_length=120)
+    api_key: str = Field(default="", max_length=512)
+
+    @field_validator("api_url")
+    @classmethod
+    def https_url(cls, value):
+        from urllib.parse import urlparse
+        parsed = urlparse(value.strip())
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("AI 接口请填写完整 HTTPS 地址")
+        return value.strip()
+
+
+@router.post("/api/ai/test")
+async def test_ai_connection(data: AiConnectionInput, db: Session = Depends(get_db)):
+    import asyncio
+    from app.ai_summary import request_summary
+    from urllib.parse import urlparse
+    saved = ai_settings(db) or {}
+    key = data.api_key.strip()
+    if not key:
+        if urlparse(data.api_url).netloc != urlparse(saved.get("api_url", "")).netloc:
+            raise HTTPException(422, "更换服务商时请填写对应 API Key")
+        key = decrypt_text(saved.get("api_key_encrypted"))
+    if not key:
+        raise HTTPException(422, "请填写 API Key")
+    try:
+        await asyncio.to_thread(request_summary, data.api_url, key, data.model, [
+            {"created_at": "", "chat_title": "连接测试", "sender_name": "测试", "text": "连接测试，请回复测试成功。"}])
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    return {"ok": True, "message": "AI 连接成功；未读取群聊，也未推送消息"}
+
+
+@router.get("/api/ai/activity")
+def ai_activity(db: Session = Depends(get_db)):
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+    config = ai_settings(db) or {}
+    now = datetime.now(ZoneInfo("Asia/Shanghai"))
+    next_at = None
+    if config.get("enabled") and config.get("trigger") == "schedule":
+        h, m = map(int, config.get("schedule_time", "23:00").split(":"))
+        next_at = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if next_at <= now:
+            next_at += timedelta(days=1)
+    count = db.query(AiSummaryMessage).filter(
+        AiSummaryMessage.account_id == config.get("account_id", 0),
+        AiSummaryMessage.chat_id.in_(config.get("source_chat_ids", [])),
+        AiSummaryMessage.created_at >= datetime.utcnow() - timedelta(hours=config.get("lookback_hours", 24))).count()
+    runs = db.query(AiSummaryRun).order_by(AiSummaryRun.id.desc()).limit(20).all()
+    return {"collected": count, "next_at": next_at, "runs": [dict(id=r.id, created_at=r.created_at, status=r.status, detail=r.detail, message_count=r.message_count, target_id=r.target_id) for r in runs]}
 
 
 def application_settings(db):
@@ -380,7 +452,7 @@ def register_monitor_scope(db, account_id, sources):
 @router.get("/console")
 @router.get("/console/{page}")
 def console_page(page: str = "overview"):
-    if page not in ("overview", "accounts", "tasks", "records", "guards", "ai", "settings"):
+    if page not in ("overview", "accounts", "tasks", "records", "guards", "ai", "broadcasts", "settings"):
         raise HTTPException(404)
     return FileResponse("static/console.html")
 
