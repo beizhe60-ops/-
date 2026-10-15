@@ -30,6 +30,7 @@ class RelayTask(Base, TimestampMixin):
     match_mode: Mapped[str] = mapped_column(String(20), default="any")
     template: Mapped[str] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class RelayJob(Base, TimestampMixin):

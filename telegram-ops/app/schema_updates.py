@@ -34,3 +34,13 @@ def allow_unconfigured_relay_target(engine):
             if sqlite:
                 conn.exec_driver_sql(f'PRAGMA foreign_keys={int(foreign_keys)}')
                 conn.commit()
+
+
+def add_task_deletion_marker(engine):
+    """Keep task/job history while removing deleted bindings from active UI."""
+    from sqlalchemy import Column, DateTime
+    with engine.begin() as conn:
+        if "deleted_at" not in {c["name"] for c in inspect(conn).get_columns("relay_tasks")}:
+            Operations(MigrationContext.configure(conn)).add_column(
+                "relay_tasks", Column("deleted_at", DateTime(), nullable=True)
+            )

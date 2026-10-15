@@ -9,7 +9,7 @@ def migrate_profiles(db):
     for account in db.query(Account).all():
         if db.get(AccountProfile, account.id):
             continue
-        tasks = db.query(RelayTask).filter(RelayTask.account_a == account.id).all()
+        tasks = db.query(RelayTask).filter(RelayTask.account_a == account.id, RelayTask.deleted_at.is_(None)).all()
         groups = sorted({gid for t in tasks for gid in json.loads(t.source_chats)})
         role = "monitor" if tasks or not account.private_message_enabled else "sender"
         db.add(
@@ -25,6 +25,7 @@ def migrate_profiles(db):
         tasks = (
             db.query(RelayTask)
             .filter_by(account_b=profile.account_id)
+            .filter(RelayTask.deleted_at.is_(None))
             .order_by(RelayTask.id)
             .all()
         )

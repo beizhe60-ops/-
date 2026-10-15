@@ -1,4 +1,6 @@
 import json
+import asyncio
+import contextlib
 from typing import Annotated
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,7 +24,7 @@ from app.account_settings import get_profile
 from app.relay_logic import filter_message, format_relay, render_copy
 from app.relay_engine import manager
 from app.workers import send_login_code, verify_login_code, sync_account_chats
-from app.telegram_client import make_client
+from app.telegram_client import make_client, CONNECT_TIMEOUT_SECONDS
 
 router = APIRouter()
 
@@ -460,7 +462,7 @@ def console_page(page: str = "overview"):
 @router.get("/api/state")
 def state(db: Session = Depends(get_db)):
     accounts = db.query(Account).order_by(Account.id).all()
-    tasks = db.query(RelayTask).order_by(RelayTask.id.desc()).all()
+    tasks = db.query(RelayTask).filter(RelayTask.deleted_at.is_(None)).order_by(RelayTask.id.desc()).all()
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     application = application_settings(db)
     return dict(
@@ -602,24 +604,56 @@ async def sync(id: int, db: Session = Depends(get_db)):
 
 @router.post("/api/accounts/{id}/logout")
 async def logout_account(id: int, db: Session = Depends(get_db)):
-    a = required(db, Account, id)
-    if manager.running:
-        raise HTTPException(409, "请先暂停服务，再退出 Telegram 账号")
-    if a.session_string_encrypted:
-        client = make_client(a, decrypt_text(a.session_string_encrypted))
+    required(db, Account, id)
+    # Only serialize work for this account. Other accounts and the service keep running.
+    async with manager.account_lock(id):
+        db.expire_all()
+        a = required(db, Account, id)
+        a.status = "login_required"
+        db.commit()
+        client = None
         try:
-            await client.connect()
-            await client.log_out()
+            await manager.disconnect_account(id)
+            if a.session_string_encrypted:
+                client = make_client(a, decrypt_text(a.session_string_encrypted))
+                await asyncio.wait_for(client.connect(), CONNECT_TIMEOUT_SECONDS)
+                authorized = await asyncio.wait_for(client.is_user_authorized(), CONNECT_TIMEOUT_SECONDS)
+                if authorized and not await asyncio.wait_for(client.log_out(), CONNECT_TIMEOUT_SECONDS):
+                    raise ValueError("Telegram logout not acknowledged")
         except Exception as exc:
-            raise HTTPException(400, login_error(exc))
+            raise HTTPException(400, "账号退出未完成，请重试：" + login_error(exc))
         finally:
-            await client.disconnect()
-    a.session_string_encrypted = None
-    a.login_temp_session_string_encrypted = None
-    a.phone_code_hash = None
-    a.status = "login_required"
-    db.commit()
-    return {"ok": True}
+            if client:
+                with contextlib.suppress(Exception):
+                    await manager.close_client(client)
+        a.session_string_encrypted = None
+        a.login_temp_session_string_encrypted = None
+        a.phone_code_hash = None
+        a.last_error = None
+        a.flood_wait_until = None
+        db.commit()
+    return {"ok": True, "message": "账号已退出，其他账号和平台任务继续运行"}
+
+
+def active_task(db, id):
+    task = required(db, RelayTask, id)
+    if task.deleted_at is not None:
+        raise HTTPException(404, "任务已删除")
+    return task
+
+
+@router.delete("/api/tasks/{id}")
+async def delete_task(id: int, db: Session = Depends(get_db)):
+    async with manager.lock:
+        task = required(db, RelayTask, id)
+        if task.deleted_at is None:
+            task.enabled = False
+            task.deleted_at = datetime.utcnow()
+            db.query(RelayJob).filter(
+                RelayJob.task_id == id, RelayJob.status.in_(["pending", "waiting"])
+            ).update({"status": "cancelled", "error": "任务已删除，未发送内容已取消"})
+            db.commit()
+    return {"ok": True, "message": "任务已删除，历史记录已保留"}
 
 
 @router.post("/api/tasks")
@@ -640,7 +674,7 @@ async def add_task(data: TaskInput, db: Session = Depends(get_db)):
 async def edit_task(id: int, data: TaskInput, db: Session = Depends(get_db)):
     validate_task(db, data)
     async with manager.lock:
-        t = required(db, RelayTask, id)
+        t = active_task(db, id)
         register_monitor_scope(db, data.account_a, data.source_chats)
         values = data.model_dump()
         values["account_b"] = data.account_b or data.account_a
@@ -660,7 +694,7 @@ async def edit_task(id: int, data: TaskInput, db: Session = Depends(get_db)):
 
 @router.post("/api/tasks/{id}/toggle")
 async def toggle_task(id: int, db: Session = Depends(get_db)):
-    t = required(db, RelayTask, id)
+    t = active_task(db, id)
     if not t.enabled:
         if t.relay_chat is None:
             raise HTTPException(422, "请先填写转发目标群组 ID，再启用绑定")

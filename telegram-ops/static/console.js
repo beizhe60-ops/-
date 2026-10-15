@@ -215,7 +215,7 @@ function tasksList() {
               .map((w) => `<span class="chip">${E(w)}</span>`)
               .join(
                 "",
-              )}</div></div><div class="actions"><button class="secondary small" data-edit-task="${t.id}">编辑配置</button><button class="${t.enabled ? "secondary" : ""} small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button></div></div>`,
+              )}</div></div><div class="actions"><button class="secondary small" data-edit-task="${t.id}">编辑配置</button><button class="${t.enabled ? "secondary" : ""} small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button><button class="text-button small danger" data-delete-task="${t.id}">删除任务</button></div></div>`,
         )
         .join("")
     : empty(
@@ -250,7 +250,7 @@ function accounts() {
               .filter((t) => t.account_a === a.id)
               .map(
                 (t) =>
-                  `<div class="group-binding-row"><div class="chips">${t.source_chats.map((g) => `<span class="chip">${g}</span>`).join("")}</div><p>→ <strong>${E(t.relay_chat ?? "待配置")}</strong></p><div class="actions">${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}<button class="secondary small" data-edit-task="${t.id}">编辑绑定</button><button class="secondary small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button></div></div>`,
+                  `<div class="group-binding-row"><div class="chips">${t.source_chats.map((g) => `<span class="chip">${g}</span>`).join("")}</div><p>→ <strong>${E(t.relay_chat ?? "待配置")}</strong></p><div class="actions">${badge(t.enabled ? "active" : "disabled", t.enabled ? "已启用" : "已暂停")}<button class="secondary small" data-edit-task="${t.id}">编辑绑定</button><button class="secondary small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button><button class="text-button small danger" data-delete-task="${t.id}">删除任务</button></div></div>`,
               )
               .join("") || '<p class="muted">尚未绑定，不会监测转发。</p>'
           }<button class="secondary small" data-monitor-groups="${a.id}">绑定监测与转发群组</button></div>`
@@ -636,6 +636,13 @@ function bindPage() {
   $$("[data-edit-task]").forEach(
     (b) => (b.onclick = () => taskDialog(Number(b.dataset.editTask))),
   );
+  $$("[data-delete-task]").forEach((b) => {
+    b.onclick = () => {
+      const task = state.tasks.find(t => t.id === Number(b.dataset.deleteTask));
+      if (confirm(`删除任务「${task?.name || b.dataset.deleteTask}」？未发送内容会取消，历史记录保留；已经发起的发送可能已交付。`))
+        action(b, () => api(`/tasks/${b.dataset.deleteTask}`, "DELETE"), "任务已删除");
+    };
+  });
   $$("[data-toggle-task]").forEach(
     (b) =>
       (b.onclick = () =>
@@ -660,7 +667,7 @@ function bindPage() {
   $$("[data-logout-account]").forEach(
     (b) =>
       (b.onclick = () => {
-        if (confirm("退出该 Telegram 账号会注销服务器登录会话。继续？"))
+        if (confirm("退出此 Telegram 账号？仅退出当前账号，其他账号继续运行；此账号的任务配置保留，重新登录后恢复。"))
           action(
             b,
             () => api(`/accounts/${b.dataset.logoutAccount}/logout`, "POST"),
