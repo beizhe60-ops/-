@@ -81,3 +81,13 @@ def add_channel_styles(engine):
         for name, default in [('emoji_style', 'alert'), ('body_format', 'normal')]:
             if name not in existing:
                 ops.add_column('channel_feeds', Column(name, String(16), nullable=False, server_default=default))
+
+
+def add_channel_include_terms(engine):
+    """Optional positive filter; existing feeds keep accepting all otherwise valid posts."""
+    from sqlalchemy import Column, Text
+    with engine.begin() as conn:
+        if 'include_terms' not in {c['name'] for c in inspect(conn).get_columns('channel_feeds')}:
+            Operations(MigrationContext.configure(conn)).add_column(
+                'channel_feeds', Column('include_terms', Text(), nullable=False, server_default='')
+            )

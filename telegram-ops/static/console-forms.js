@@ -64,7 +64,7 @@ function organizeForm(form) {
     });
   }
   if(form.id==='channel-feed-form') {
-    const grid=form.querySelector(':scope > .form-grid');if(grid)foldSection(grid,'来源账号与频道',true);
+    const grid=form.querySelector(':scope > .form-grid');if(grid)foldSection(grid,'来源账号与频道 / 超级群',true);
   }
   if(form.id==='receive-groups-form') {
     const copy=form.querySelector('.copy-composer');if(copy)foldSection(copy,'私信文案、格式与配图',true);

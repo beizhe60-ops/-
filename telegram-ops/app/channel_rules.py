@@ -14,7 +14,7 @@ def normalized(text):
     return unicodedata.normalize('NFKC', text).casefold()
 
 
-def filter_post(text, exclude_terms, filter_ads, ad_terms):
+def filter_post(text, exclude_terms, filter_ads, ad_terms, include_terms=''):
     content = normalized(text)
     for term in terms(exclude_terms):
         if normalized(term) in content:
@@ -25,6 +25,9 @@ def filter_post(text, exclude_terms, filter_ads, ad_terms):
                 return '广告规则：' + term
         if re.search(r'(?im)^\s*(?:\[ad\]|【广告】|\[广告\]|广告[:：])', text):
             return '广告规则：广告标记'
+    required_terms = terms(include_terms)
+    if required_terms and not any(normalized(term) in content for term in required_terms):
+        return '未命中收录关键词'
     return None
 
 

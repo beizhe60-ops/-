@@ -28,6 +28,7 @@ class FeedInput(BaseModel):
     account_id: int = Field(strict=True,gt=0)
     source: str = Field(default='qt00',min_length=1,max_length=100)
     target_id: GroupId | None = None
+    include_terms: str = Field(default='',max_length=4000)
     exclude_terms: str = Field(default='七天',max_length=4000)
     auto_publish: bool = Field(default=False,strict=True)
     template_title: str = Field(default='曝光档案',min_length=1,max_length=60)
@@ -43,7 +44,7 @@ class FeedInput(BaseModel):
         match = re.fullmatch(r'(?:https://t\.me/|@)?([A-Za-z][A-Za-z0-9_]{3,31})/?',value)
         if match: return match.group(1).lower()
         if re.fullmatch(r'-[1-9]\d{0,15}',value) and -(2**52)<=int(value)<0: return value
-        raise ValueError('请填写公开频道链接、@用户名或完整负数频道 ID')
+        raise ValueError('请填写频道或超级群的公开链接、@用户名或完整负数 ID')
 
     @field_validator('name','template_title')
     @classmethod
@@ -51,7 +52,7 @@ class FeedInput(BaseModel):
         if not value.strip(): raise ValueError('请填写采集名称')
         return value.strip()
 
-    @field_validator('exclude_terms','ad_terms')
+    @field_validator('include_terms','exclude_terms','ad_terms')
     @classmethod
     def clean_terms(cls,value):
         items = terms(value)
@@ -70,9 +71,15 @@ class DraftInput(VersionInput):
 
 class FilterInput(BaseModel):
     text: str = Field(max_length=16000)
+    include_terms: str = Field(default='',max_length=4000)
     exclude_terms: str = Field(default='七天',max_length=4000)
     ad_terms: str = Field(default=DEFAULT_AD_TERMS,max_length=4000)
     filter_ads: bool = Field(default=True,strict=True)
+
+    @field_validator('include_terms','exclude_terms','ad_terms')
+    @classmethod
+    def clean_terms(cls,value):
+        return FeedInput.clean_terms(value)
 
 
 def required(db, model, key):
@@ -83,7 +90,7 @@ def required(db, model, key):
 
 def feed_payload(db,feed):
     counts = dict(db.query(ChannelDraft.status,func.count(ChannelDraft.id)).filter_by(feed_id=feed.id).group_by(ChannelDraft.status).all())
-    return {k:getattr(feed,k) for k in ('id','name','account_id','source','source_id','source_title','target_id','exclude_terms','ad_terms','filter_ads','auto_publish','template_title','emoji_style','body_format','enabled','revision','started_at','checked_at','error')} | dict(counts=counts)
+    return {k:getattr(feed,k) for k in ('id','name','account_id','source','source_id','source_title','target_id','include_terms','exclude_terms','ad_terms','filter_ads','auto_publish','template_title','emoji_style','body_format','enabled','revision','started_at','checked_at','error')} | dict(counts=counts)
 
 
 def draft_payload(draft, detail=False):
@@ -113,7 +120,7 @@ async def save_feed(data:FeedInput, feed_id:int|None=None, db:Session=Depends(ge
     if data.target_id and feed.source_id==data.target_id:
         raise HTTPException(422,'来源频道和发布频道需要分别设置')
     for key,value in data.model_dump().items():
-        if feed_id and key in ('auto_publish','template_title','emoji_style','body_format') and key not in data.model_fields_set:
+        if feed_id and key in ('auto_publish','template_title','emoji_style','body_format','include_terms') and key not in data.model_fields_set:
             continue  # Older clients omit the new options; preserve the saved mode.
         setattr(feed,key,value)
     feed.enabled,feed.error = False,None
@@ -144,7 +151,10 @@ async def feed_action(feed_id:int,action:str):
                 raise HTTPException(422,'请启动后台服务，并等待采集账号连接成功')
         try:
             entity=await asyncio.wait_for(worker.client.get_entity(int(source) if source.startswith('-') else source),READ_TIMEOUT)
-            if not getattr(entity,'broadcast',False): raise HTTPException(422,'来源需要选择频道，群组请使用监测转发')
+            if not (getattr(entity,'broadcast',False) or getattr(entity,'megagroup',False)):
+                raise HTTPException(422,'来源请选择频道或超级群；普通群暂不支持采编')
+            if getattr(entity,'access_hash',None) is None:
+                raise HTTPException(422,'来源读取信息不完整，请更新账号群组列表后重试')
             source_id=utils.get_peer_id(entity)
             if source_id==target: raise HTTPException(422,'来源频道和发布频道需要分别设置')
             if automatic and target:
@@ -161,13 +171,13 @@ async def feed_action(feed_id:int,action:str):
             set_wait(account_id,exc.seconds)
             raise HTTPException(422,f'Telegram 要求等待 {exc.seconds} 秒后再试')
         except Exception as exc:
-            raise HTTPException(422,'频道读取验证未完成：'+type(exc).__name__+'；请检查账号是否有读取权限')
+            raise HTTPException(422,'来源读取验证未完成：'+type(exc).__name__+'；请检查账号是否有读取权限')
         with session_scope() as db:
             feed=required(db,ChannelFeed,feed_id)
             if feed.revision!=revision or not manager.running or manager.workers.get(account_id) is not worker or not available(db.get(Account,account_id)):
                 raise HTTPException(409,'配置或连接已变化，请重试')
             if feed.source_id and feed.source_id!=source_id and db.query(ChannelDraft.id).filter_by(feed_id=feed_id).first():
-                raise HTTPException(409,'频道标识已变化，请新建采集')
+                raise HTTPException(409,'来源标识已变化，请新建采集')
             feed.source_id,feed.source_hash,feed.source_title=source_id,str(entity.access_hash),entity.title[:255]
             feed.cursor=latest[0].id if latest else 0
             feed.enabled,feed.started_at,feed.checked_at,feed.error=True,datetime.utcnow(),datetime.utcnow(),None
@@ -177,7 +187,7 @@ async def feed_action(feed_id:int,action:str):
 
 @router.post('/api/channel-filter/preview')
 def filter_preview(data:FilterInput):
-    reason=filter_post(data.text,data.exclude_terms,data.filter_ads,data.ad_terms)
+    reason=filter_post(data.text,data.exclude_terms,data.filter_ads,data.ad_terms,data.include_terms)
     return dict(accepted=reason is None,reason=reason or '进入待编辑草稿')
 
 

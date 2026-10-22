@@ -63,7 +63,7 @@ def ingest(db, feed, messages):
     for key, rows in groups.items():
         text = '\n\n'.join(m.raw_text for m in rows if m.raw_text)
         media = [dict(id=m.id, kind=media_kind(m)) for m in rows if media_kind(m)]
-        reason = filter_post(text, feed.exclude_terms, feed.filter_ads, feed.ad_terms)
+        reason = filter_post(text, feed.exclude_terms, feed.filter_ads, feed.ad_terms, feed.include_terms)
         if not text.strip() and not media:
             feed.cursor = max(feed.cursor, rows[-1].id)
             continue
@@ -136,7 +136,7 @@ async def collect_feed(manager, feed_id):
         except Exception as exc:
             with session_scope() as db:
                 feed = db.get(ChannelFeed, feed_id)
-                if feed: feed.error = '采集暂未完成：' + type(exc).__name__ + '；请检查账号及频道读取权限'
+                if feed: feed.error = '采集暂未完成：' + type(exc).__name__ + '；请检查账号及来源读取权限'
 
 
 def recover_channel_posts():
@@ -179,7 +179,7 @@ async def publish_next(manager, account_id):
         try:
             target_entity = await asyncio.wait_for(worker.client.get_entity(target), READ_TIMEOUT)
             if not getattr(target_entity, 'broadcast', False):
-                raise ValueError('发布目标请填写频道 ID，群组不作为曝光频道')
+                raise ValueError('发布目标请填写频道 ID')
             rights = getattr(target_entity, 'admin_rights', None)
             if not (getattr(target_entity, 'creator', False) or getattr(rights, 'post_messages', False)):
                 raise ValueError('该账号需要目标频道的发布消息权限')

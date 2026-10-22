@@ -16,6 +16,7 @@ class ChannelFeed(Base, TimestampMixin):
     source_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_title: Mapped[str] = mapped_column(String(255), default='')
     target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    include_terms: Mapped[str] = mapped_column(Text, default='', server_default='')
     exclude_terms: Mapped[str] = mapped_column(Text, default='七天')
     ad_terms: Mapped[str] = mapped_column(Text, default='广告合作\n广告招商\n广告位招租\n付费推广\n商务合作\n推广合作')
     filter_ads: Mapped[bool] = mapped_column(Boolean, default=True)
