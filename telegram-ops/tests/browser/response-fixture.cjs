@@ -36,6 +36,8 @@ const server=http.createServer(async(req,res)=>{
  else if(url.pathname==='/api/records')data={total:120,items:Array.from({length:50},(_,i)=>({id:i+1,task_id:1,stage:'relay',username:'example_user',source_title:'测试群',chat_id:-1001,text:'测试消息正文。'.repeat(100),original_text:'咨询',status:'sent',created_at:'2026-10-23T00:00:00'}))};
  else if(url.pathname==='/api/ai/settings'){if(req.method==='PUT')ai={...ai,...body};data=ai;}
  else if(url.pathname==='/api/ai/activity')data={collected:1,next_at:null,runs:[]};
+ else if(url.pathname==='/api/ai/preview')data={preview:'这是模拟摘要，未发送消息。',message_count:1};
+ else if(url.pathname==='/api/broadcasts')data=[];
  else if(url.pathname==='/api/channel-feeds')data=[feed];
  else if(url.pathname==='/api/channel-drafts')data={total:0,items:[]};
  else if(url.pathname==='/api/channel-feeds/1'){feed={...feed,...body,enabled:false,revision:feed.revision+1};data=feed;}

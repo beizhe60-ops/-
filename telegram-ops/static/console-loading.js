@@ -4,6 +4,7 @@ let stateReadAt = 0;
 let navigationPending = false;
 let writeRequests = 0;
 const pageScroll = new Map();
+let displayedConsoleUrl = location.pathname + location.search;
 
 function recordPath({offset=recordOffset,status=recordStatus,search=recordSearch}={}) {
   return `/records?status=${encodeURIComponent(status)}&q=${encodeURIComponent(search)}&offset=${offset}`;
@@ -52,6 +53,7 @@ function replaceRegion(selector, html) {
 }
 function updateAccountView(id, changes) {
   updateState(s=>Object.assign(s.accounts.find(a=>a.id===id),changes));
+  if(page==='tasks')replaceRegion(`[data-sender-task="${id}"]`,senderTasks());
   if(page==='accounts')replaceRegion(`[data-account-card="${id}"]`,accounts());
 }
 function updateTaskView(task) {
@@ -73,12 +75,12 @@ async function navigateConsole(url, {pop=false}={}) {
   if(!Object.hasOwn(titles,target))return;
   if(writeRequests || servicePending) {
     toast('操作正在处理，请稍候再切换页面');
-    if(pop)history.pushState(null,'',page==='overview'?'/console':`/console/${page}`);
+    if(pop)history.pushState(null,'',displayedConsoleUrl);
     return;
   }
   if($('#modal').open) {
     if(channelDirty && !confirm('有尚未保存的正文修改，确定关闭？')) {
-      if(pop)history.pushState(null,'',page==='overview'?'/console':`/console/${page}`);
+      if(pop)history.pushState(null,'',displayedConsoleUrl);
       return;
     }
     $('#modal').close();
@@ -99,15 +101,17 @@ async function navigateConsole(url, {pop=false}={}) {
     ]);
     if(revision!==renderRevision)return;
     page=target;
+    readViewRoute(url);
     await render({revision,data});
     if(revision!==renderRevision)return;
     if(!pop)history.pushState(null,'',url.pathname+url.search);
+    displayedConsoleUrl=url.pathname+url.search;
     content.focus({preventScroll:true});
     window.scrollTo(...(pageScroll.get(target)||[0,0]));
   } catch(error) {
     if(revision!==renderRevision)return;
     page=previousPage;updateChrome();toast(error.message);
-    if(pop)history.replaceState(null,'',page==='overview'?'/console':`/console/${page}`);
+    if(pop)history.replaceState(null,'',displayedConsoleUrl);
   } finally {
     if(revision===renderRevision){navigationPending=false;content.inert=false;content.removeAttribute('aria-busy');if(state)serviceHeader();}
   }
@@ -127,6 +131,7 @@ window.addEventListener('popstate',()=>navigateConsole(new URL(location.href),{p
 let aiActivityRevision=0;
 function applyAiSettings(saved, form, submittedKey) {
   if(!form.isConnected)return;
+  $('#ai-saved-overview').innerHTML=aiSavedOverview(saved);
   $('#ai-plan-status').innerHTML=badge(saved.enabled&&saved.trigger!=='manual'?'active':'disabled',saved.trigger==='manual'?'仅手动生成':saved.enabled?'自动摘要已启用':'自动摘要已暂停');
   const key=form.querySelector('[name=api_key]');
   if(key.value===submittedKey)key.value='';

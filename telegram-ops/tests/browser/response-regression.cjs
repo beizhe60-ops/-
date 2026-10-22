@@ -22,6 +22,7 @@ const f=require('./response-fixture.cjs');
   const cold=f.calls.slice(first);assert(cold.find(c=>c.path==='/api/records').start<cold.find(c=>c.path==='/api/state').end);
   await p.locator('#record-search').fill('example');await p.locator('#search-records').click();await p.waitForFunction(()=>!document.querySelector('#content').hasAttribute('aria-busy'));
   await nav('accounts','账号管理');await p.locator('[data-account-tab="sender"]').click();
+  await p.getByRole('link',{name:'管理私信接收',exact:true}).click();await p.locator('[data-weight="2"]').waitFor();
   await p.locator('[data-weight="2"]').click();await p.locator('#weight-form [name=weight]').fill('8');
   // A stale, slow background snapshot must neither block nor undo a confirmed save.
   const stale=f.holdNext('/api/state');
@@ -35,7 +36,7 @@ const f=require('./response-fixture.cjs');
   assert(await p.evaluate(()=>savedSidebar===document.querySelector('.sidebar')&&untouchedCard===document.querySelector('.page-heading')));
   // No document reload for navigation; back/forward retains applied record filters.
   await nav('records','消息记录');assert.equal(await p.locator('#record-search').inputValue(),'example');
-  await p.goBack();await p.locator('[data-account-tab="sender"][aria-selected="true"]').waitFor();
+  await p.goBack();await p.locator('#tasks-tab-private[aria-selected="true"]').waitFor();
   await p.goForward();await p.locator('#record-search').waitFor();assert.equal(await p.locator('#record-search').inputValue(),'example');assert.equal(documents,1);
   // Repeated identical reads are shared while in flight.
   let before=count('/api/ai/activity');await p.evaluate(()=>Promise.all([api('/ai/activity'),api('/ai/activity')]));assert.equal(count('/api/ai/activity')-before,1);
@@ -47,7 +48,7 @@ const f=require('./response-fixture.cjs');
   f.failNext('/api/channel-feeds');await p.locator('nav [data-page="channels"]').click();await p.waitForFunction(()=>!document.querySelector('#content').inert);
   assert.equal(await p.locator('#content h1').innerText(),'账号管理');assert(p.url().endsWith('/console/accounts'));
   // A rejected write preserves both entered values and the previous task state.
-  await nav('tasks','监测转发');await p.locator('[data-edit-task="1"]').click();
+  await nav('tasks','监测转发');await p.getByRole('tab',{name:'监测任务',exact:true}).click();await p.locator('[data-edit-task="1"]').click();
   const original=f.state.tasks[0].name;await p.locator('#task-form [name=name]').fill('失败后保留输入');f.failNext('/api/tasks/1');
   await p.getByRole('button',{name:'保存更改并暂停',exact:true}).click();await p.locator('#task-form .form-error').filter({hasText:'模拟请求失败'}).waitFor();
   assert.equal(await p.locator('#task-form [name=name]').inputValue(),'失败后保留输入');assert.equal(f.state.tasks[0].name,original);
@@ -60,7 +61,7 @@ const f=require('./response-fixture.cjs');
   assert.equal(f.state.tasks[0].enabled,true);assert.equal(count('/api/state'),beforeToggle);
   assert(await p.evaluate(()=>otherTask===document.querySelector('[data-task-row="2"]')));
   // AI save keeps the form, selection and later edits; no second settings read.
-  await nav('ai','AI 群组分析');const settingsReads=count('/api/ai/settings');
+  await nav('ai','AI 群组分析');await p.getByRole('tab',{name:'分析设置',exact:true}).click();const settingsReads=count('/api/ai/settings');
   await p.evaluate(()=>{window.originalForm=document.querySelector('#ai-form')});
   await p.locator('#ai-form [name=message_count]').fill('70');
   const aiWrite=f.holdNext('/api/ai/settings');const saved=p.waitForRequest(r=>r.method()==='PUT'&&r.url().endsWith('/api/ai/settings'));
@@ -74,13 +75,13 @@ const f=require('./response-fixture.cjs');
   await p.waitForFunction(()=>document.querySelectorAll('[data-picker="source_chat_ids"] .group-option').length<20);
   assert.equal(await p.locator('[data-picker="source_chat_ids"] [name="source_chat_ids"]').inputValue(),'-1001');
   // Channel save uses the persisted paused result, not an optimistic enabled state.
-  await nav('channels','频道采编');await p.locator('[data-feed-edit="1"]').click();await p.locator('#channel-feed-form [name=name]').fill('局部更新的采集');
+  await nav('channels','频道采编');await p.getByRole('tab',{name:'采集设置',exact:true}).click();await p.locator('[data-feed-edit="1"]').click();await p.locator('#channel-feed-form [name=name]').fill('局部更新的采集');
   await p.evaluate(()=>{window.channelHeading=document.querySelector('.page-heading')});
   const postRead=p.waitForResponse(r=>r.url().includes('/api/channel-drafts'));const feedsBefore=count('/api/channel-feeds');await p.getByRole('button',{name:'保存采集设置',exact:true}).click();await p.locator('.channel-feed strong').filter({hasText:'局部更新的采集'}).waitFor();
   assert.equal(f.feed.enabled,false);assert.equal(count('/api/channel-feeds'),feedsBefore);assert(await p.evaluate(()=>channelHeading===document.querySelector('.page-heading')));
   await postRead;
   // Filter failure rolls back the selection; it does not quietly change query state.
-  f.failNext('/api/channel-drafts');await p.locator('#channel-status').selectOption('sent');await p.waitForFunction(()=>!document.querySelector('#channel-status').disabled);
+  await p.getByRole('tab',{name:'采编结果',exact:true}).click();f.failNext('/api/channel-drafts');await p.locator('#channel-status').selectOption('sent');await p.waitForFunction(()=>!document.querySelector('#channel-status').disabled);
   assert.equal(await p.locator('#channel-status').inputValue(),'all');
   assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   fs.mkdirSync(path.resolve(rootPath(),'artifacts/response-speed'),{recursive:true});

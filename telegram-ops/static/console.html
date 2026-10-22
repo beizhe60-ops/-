@@ -6,12 +6,14 @@
     <title>Telegram Ops · 消息工作台</title>
     <link rel="stylesheet" href="/static/console.css?v=20261015-rich-copy" />
     <link rel="stylesheet" href="/static/channel-editor.css?v=20261023-channel-styles" />
+    <link rel="stylesheet" href="/static/console-layout.css?v=20261023-layout" />
     <script defer src="/static/channel-rich-text.js?v=20261023-channel-styles"></script>
-    <script defer src="/static/channel-editor.js?v=20261023-response-speed"></script>
+    <script defer src="/static/channel-editor.js?v=20261023-layout"></script>
     <script defer src="/static/dm-editor.js?v=20261015-rich-copy"></script>
-    <script defer src="/static/workspace.js?v=20261023-response-speed"></script>
-    <script defer src="/static/console-loading.js?v=20261023-response-speed"></script>
-    <script defer src="/static/console.js?v=20261023-response-speed"></script>
+    <script defer src="/static/workspace.js?v=20261023-layout"></script>
+    <script defer src="/static/console-loading.js?v=20261023-layout"></script>
+    <script defer src="/static/console-views.js?v=20261023-layout"></script>
+    <script defer src="/static/console.js?v=20261023-layout"></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -19,21 +21,19 @@
         ><span class="brand-icon">↗</span
         ><span>Telegram Ops<small>消息工作台</small></span></a
       >
-      <div class="nav-label">工作空间</div>
       <nav aria-label="主导航">
-        <a href="/console" data-page="overview"><span>◫</span>工作台</a
-        ><a href="/console/accounts" data-page="accounts"
-          ><span>◎</span>账号管理</a
-        ><a href="/console/broadcasts" data-page="broadcasts"><span>↗</span>群发任务</a
-        ><a href="/console/tasks" data-page="tasks"><span>⇄</span>监测转发</a
-        ><a href="/console/channels" data-page="channels"><span>▤</span>频道采编</a
-        ><a href="/console/ai" data-page="ai"><span>✦</span>AI 群组分析</a
-        ><a href="/console/records" data-page="records"
-          ><span>≡</span>转发与私信记录</a
-        ><a href="/console/guards" data-page="guards"><span>⊘</span>不再联系</a
-        ><a href="/console/settings" data-page="settings" class="mobile-only"
-          >系统设置</a
-        ><a href="/admin/logout" class="mobile-only">退出</a>
+        <a href="/console" data-page="overview"><span>◫</span>工作台</a>
+        <div class="nav-section">任务与内容</div>
+        <a href="/console/broadcasts" data-page="broadcasts"><span>↗</span>群发任务</a>
+        <a href="/console/tasks" data-page="tasks"><span>⇄</span>监测转发</a>
+        <a href="/console/channels" data-page="channels"><span>▤</span>频道采编</a>
+        <a href="/console/ai" data-page="ai"><span>✦</span>AI 群组分析</a>
+        <div class="nav-section">管理与记录</div>
+        <a href="/console/accounts" data-page="accounts"><span>◎</span>账号管理</a>
+        <a href="/console/records" data-page="records"><span>≡</span>消息记录</a>
+        <a href="/console/guards" data-page="guards"><span>⊘</span>不再联系</a>
+        <a href="/console/settings" data-page="settings" class="mobile-only">系统设置</a>
+        <a href="/admin/logout" class="mobile-only">退出后台</a>
       </nav>
       <div class="sidebar-bottom">
         <a href="/console/settings" data-page="settings">⚙　系统设置</a>

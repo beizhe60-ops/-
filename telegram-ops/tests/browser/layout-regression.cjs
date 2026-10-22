@@ -1,0 +1,70 @@
+// UI structure and preserved operations; fictional data only, no external clients.
+process.env.API_DELAY_MS='40';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'/Users/hahaha/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const f=require('./response-fixture.cjs');
+const out=path.resolve(__dirname,'../../../artifacts/layout-refresh');
+(async()=>{
+ fs.mkdirSync(out,{recursive:true});
+ await new Promise(resolve=>f.server.listen(0,'127.0.0.1',resolve));
+ const origin='http://127.0.0.1:'+f.server.address().port;
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+ const report=[];
+ for(const width of [1440,390]){
+  const p=await browser.newPage({viewport:{width,height:width===390?844:1000}});
+  await p.addInitScript(()=>{const interval=window.setInterval;window.setInterval=(fn,ms,...args)=>ms===15000?0:interval(fn,ms,...args)});
+  const errors=[];p.on('pageerror',e=>errors.push(e.message));
+  const routes=[],writes=()=>f.calls.filter(c=>c.method!=='GET').length;
+  const nav=async(name)=>{await p.locator('nav [data-page="'+name+'"]').click();await p.waitForFunction(name=>page===name&&!navigationPending,name);};
+  const snapshot=async(name)=>{assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,name+' overflows');await p.screenshot({path:path.join(out,`${name}-${width}.png`),fullPage:false});routes.push(name);};
+  await p.goto(origin+'/console/accounts');await p.locator('[data-account-card="1"]').waitFor();
+  assert.equal(await p.locator('#content [data-edit-task],#content [data-toggle-task],#content [data-weight]').count(),0);
+  assert(await p.locator('[data-sync="1"]').isVisible());assert(await p.locator('[data-logout-account="1"]').isVisible());await snapshot('accounts');
+  const writesBefore=writes();await p.getByRole('link',{name:'查看关联任务',exact:true}).click();
+  await p.locator('[data-task-account="relay"]').waitFor();assert.equal(await p.locator('[data-task-account="relay"]').inputValue(),'1');
+  assert(p.url().includes('account=1'));await snapshot('tasks');
+  await nav('accounts');await p.getByRole('tab',{name:'私信账号 1'}).click();await p.getByRole('link',{name:'管理私信接收',exact:true}).click();
+  await p.locator('#tasks-tab-private[aria-selected=true]').waitFor();assert(await p.locator('[data-weight="2"]').isVisible());assert(await p.locator('[data-receive-groups="2"]').isVisible());
+  assert.equal(writes(),writesBefore);await snapshot('private-tasks');
+  await nav('records');await p.locator('.records-table tbody tr').first().waitFor();
+  const excerpt=p.locator('.record-excerpt').first();assert((await excerpt.boundingBox()).height<48);
+  const full=await excerpt.innerText();assert(full.length>200);
+  await p.locator('[data-record-detail="1"]').click();assert.equal(await p.locator('.record-detail .message-body').first().innerText(),full);
+  assert(await p.getByRole('heading',{name:'原始发言',exact:true}).isVisible());await p.locator('#close-modal').click();
+  assert.equal(await p.locator('.records-table tbody tr').count(),50);await snapshot('records');
+  await nav('ai');assert(await p.locator('#ai-view-results').isVisible());assert(!await p.locator('#ai-form').isVisible());
+  assert.equal(await p.locator('[data-picker="source_chat_ids"] .group-option').count(),0);await snapshot('ai-results');
+  const reads=f.calls.length;await p.getByRole('tab',{name:'分析设置',exact:true}).click();
+  await p.locator('#ai-form [name=message_count]').fill('87');await p.locator('.connection-settings summary').click();await p.locator('#ai-form [name=api_key]').fill('fictional-key-not-saved');
+  await p.evaluate(()=>window.layoutForm=document.querySelector('#ai-form'));
+  await p.getByRole('tab',{name:'分析结果',exact:true}).click();await p.getByRole('tab',{name:'分析设置',exact:true}).click();
+  assert.equal(f.calls.length,reads);assert.equal(await p.locator('#ai-form [name=message_count]').inputValue(),'87');
+  assert.equal(await p.locator('#ai-form [name=api_key]').inputValue(),'fictional-key-not-saved');assert(await p.evaluate(()=>layoutForm===document.querySelector('#ai-form')));
+  await p.getByRole('tab',{name:'分析设置',exact:true}).press('ArrowLeft');assert(await p.locator('#ai-view-results').isVisible());
+  const refresh=p.waitForResponse(r=>r.url().endsWith('/api/ai/activity'));await p.locator('#refresh-ai-activity').click();await refresh;
+  assert.equal(await p.locator('#ai-form [name=message_count]').inputValue(),'87');
+  const writesBeforePreview=writes();await p.locator('#preview-ai-summary').click();await p.getByRole('heading',{name:'摘要预览 · 未推送',exact:true}).waitFor();
+  assert.equal(f.calls.filter(c=>c.method!=='GET').slice(writesBeforePreview).some(c=>c.path==='/api/ai/settings'),false);
+  await p.locator('#close-modal').click();await p.getByRole('tab',{name:'分析设置',exact:true}).click();await snapshot('ai-settings');
+  await nav('channels');assert(await p.locator('#channels-view-results').isVisible());assert(!await p.locator('#channel-feeds-panel').isVisible());
+  const channelReads=f.calls.length;await p.getByRole('tab',{name:'采集设置',exact:true}).click();assert(await p.locator('[data-feed-edit="1"]').isVisible());
+  await snapshot('channel-settings');await p.getByRole('tab',{name:'采编结果',exact:true}).click();assert.equal(f.calls.length,channelReads);await snapshot('channel-results');
+  await nav('overview');await snapshot('home');assert.equal(await p.locator('.workflow-entry').count(),4);
+  await p.reload();await p.locator('.workflow-entry').first().waitFor();
+  await p.goto(origin+'/console/ai?view=settings');await p.locator('#ai-form [name=message_count]').waitFor();assert(await p.locator('#ai-form').isVisible());
+  await p.goto(origin+'/console/tasks?view=private&account=2');await p.locator('[data-weight="2"]').waitFor();assert(await p.locator('#tasks-view-private').isVisible());
+  // Failed Back navigation must preserve both the visible tab and account query.
+  await nav('ai');await p.getByRole('tab',{name:'分析设置',exact:true}).click();await nav('tasks');
+  await p.getByRole('tab',{name:'私信接收',exact:true}).click();const privateUrl=p.url();
+  f.failNext('/api/ai/settings');await p.goBack();await p.waitForFunction(()=>!navigationPending);
+  assert.equal(p.url(),privateUrl);assert(await p.locator('#tasks-view-private').isVisible());
+  // Back during a pending write must leave the current task selection intact.
+  await p.locator('[data-weight="2"]').click();const pending=f.holdNext('/api/accounts/2/weight');
+  await p.getByRole('button',{name:'保存权重',exact:true}).click();await pending.started;
+  await p.goBack();await p.waitForFunction(()=>document.querySelector('#toast').textContent.includes('操作正在处理'));
+  assert.equal(p.url(),privateUrl);assert(await p.locator('#weight-form').isVisible());
+  pending.release();await p.waitForFunction(()=>!document.querySelector('#modal').open);
+  assert.deepEqual(errors,[]);report.push({width,routes,accountTaskSeparation:true,compactRecordsWithFullDetail:true,tabsPreserveInputsAndAvoidRequests:true,deepLinks:true,errors});await p.close();
+ }
+ await browser.close();f.server.close();fs.writeFileSync(path.join(out,'regression.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
+})().catch(e=>{console.error(e);process.exit(1)});
