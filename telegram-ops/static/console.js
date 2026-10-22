@@ -178,18 +178,28 @@ $("#modal").addEventListener("click", (e) => {
 });
 function setupForm(selector, callback) {
   const f = $(selector);
+  organizeForm(f);
+  if(guardedFormIds.has(f.id))watchForm(f);
   f.onsubmit = async (e) => {
     e.preventDefault();
+    const watched=watchedForms.get(f);
+    let submitted;
+    try {submitted=watched?formSnapshot(f,watched.extra):null;} catch(error){toast(error.message);return;}
+    const modalForm=!!f.closest("dialog");
+    if(modalForm)f.inert=true;
     const button = e.submitter || f.querySelector("button[type=submit]");
     if (button) button.disabled = true;
     const err = f.querySelector(".form-error");
     if (err) err.textContent = "";
     try {
       await callback(new FormData(f), f);
+      savedForm(f,submitted);
     } catch (ex) {
+      f.querySelectorAll(".form-step").forEach(d=>d.open=true);
       if (err) err.textContent = ex.message;
       else toast(ex.message);
     } finally {
+      if(modalForm)f.inert=false;
       if (button) button.disabled = false;
     }
   };
@@ -214,6 +224,7 @@ async function load({refreshState=true}={}) {
 $("#service-button").onclick = async () => {
   const b = $("#service-button");
   if (servicePending) return;
+  if(!confirmLeave())return;
   servicePending = true;
   const wasRunning = state.running;
   b.disabled = true;
@@ -247,7 +258,7 @@ function tasksList() {
               .map((w) => `<span class="chip">${E(w)}</span>`)
               .join(
                 "",
-              )}</div></div><div class="actions"><button class="secondary small" data-edit-task="${t.id}">编辑配置</button><button class="${t.enabled ? "secondary" : ""} small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button><button class="text-button small danger" data-delete-task="${t.id}">删除任务</button></div></div>`,
+              )}</div></div><div class="actions"><button class="secondary small" data-diagnose-task="${t.id}">诊断</button><button class="secondary small" data-edit-task="${t.id}">编辑配置</button><button class="${t.enabled ? "secondary" : ""} small" data-toggle-task="${t.id}">${t.enabled ? "暂停任务" : "启用任务"}</button><button class="text-button small danger" data-delete-task="${t.id}">删除任务</button></div></div>`,
         )
         .join("")
     : empty(
@@ -278,25 +289,28 @@ async function records({
   offset = recordOffset,
   status = recordStatus,
   search = recordSearch,
+  period = recordPeriod,
+  task = recordTask,
   data,
 } = {}) {
   const revision=renderRevision;
-  const r=data??await api(recordPath({offset,status,search}));
-  if(revision===renderRevision)recordItems=r.items;
+  const r=data??await api(recordPath({offset,status,search,period,task}));
+  if(revision===renderRevision){recordItems=r.items;recordResult=r;}
   return heading('消息记录','查看转发与私信的执行结果。点击详情可查看完整内容、原始发言和错误原因。','<button class="secondary" id="refresh-records">刷新记录</button>')+
-    `<section class="panel records-panel"><div class="panel-head"><div class="filters record-filters"><input id="record-search" aria-label="按用户名搜索" placeholder="搜索 @用户名" value="${E(search)}"><select id="record-status" aria-label="发送状态"><option value="">全部状态</option>${['pending','waiting','sending','sent','failed','unknown','skipped','cancelled'].map(s=>`<option value="${s}" ${status===s?'selected':''}>${labels[s]}</option>`).join('')}</select><button class="secondary small" id="search-records">筛选</button></div><span class="muted">${r.total} 条记录</span></div>
-    ${r.items.length?`<div class="table-wrap"><table class="records-table"><thead><tr><th>类型 / 时间</th><th>用户 / 来源</th><th>内容摘要</th><th>状态</th><th>操作</th></tr></thead><tbody>${r.items.map(j=>`<tr><td class="record-time">${j.stage==='relay'?'群组转发':'自动私信'}<small>${E(date(j.created_at))}</small></td><td class="record-user"><strong>@${E(j.username)}</strong><small class="truncate">${E(j.source_title)}</small></td><td class="record-content"><div class="record-excerpt">${E(plainMessage(j.text))}</div></td><td class="record-status">${badge(j.status)}${j.error?'<small class="error-text">查看详情了解原因</small>':''}${j.status==='waiting'?`<small>${E(date(j.due_at))}</small>`:''}</td><td><div class="actions record-actions"><button class="secondary small" data-record-detail="${j.id}">详情</button>${['pending','waiting'].includes(j.status)?`<button class="text-button small" data-cancel-job="${j.id}">取消</button>`:''}${j.user_id?`<button class="text-button small" data-block-user="${j.user_id}">不再联系</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:empty('没有符合条件的记录','调整用户名或状态后重新筛选。')}<div class="pagination"><span>第 ${Math.floor(offset/50)+1} / ${Math.max(1,Math.ceil(r.total/50))} 页 · 每页 50 条</span><div class="actions"><button class="secondary small" id="prev-page" ${offset===0?'disabled':''}>上一页</button><button class="secondary small" id="next-page" ${offset+50>=r.total?'disabled':''}>下一页</button></div></div></section>`;
+    `<section class="panel records-panel"><div class="panel-head"><div class="filters record-filters"><input id="record-search" aria-label="按用户名搜索" placeholder="搜索 @用户名" value="${E(search)}"><select id="record-status" aria-label="发送状态"><option value="">全部状态</option>${['exceptions','pending','waiting','sending','sent','failed','unknown','skipped','cancelled'].map(s=>`<option value="${s}" ${status===s?'selected':''}>${s==='exceptions'?'失败与待核实':labels[s]}</option>`).join('')}</select>${recordExtraFilters(r,period,task)}<button class="secondary small" id="search-records">筛选</button></div><span class="muted" id="record-total">${r.total} 条记录</span></div>
+    <div id="record-rows">${r.items.length?`<div class="table-wrap"><table class="records-table"><thead><tr><th>类型 / 时间</th><th>用户 / 来源</th><th>内容摘要</th><th>状态</th><th>操作</th></tr></thead><tbody>${r.items.map(j=>`<tr><td class="record-time">${j.stage==='relay'?'群组转发':'自动私信'}<small>${E(date(j.created_at))}</small></td><td class="record-user"><strong>@${E(j.username)}</strong><small class="truncate">${E(j.source_title)}</small></td><td class="record-content"><div class="record-excerpt">${E(plainMessage(j.text))}</div></td><td class="record-status">${badge(j.status)}${j.error?'<small class="error-text">查看详情了解原因</small>':''}${j.status==='waiting'?`<small>${E(date(j.due_at))}</small>`:''}</td><td><div class="actions record-actions"><button class="secondary small" data-record-detail="${j.id}">详情</button>${['pending','waiting'].includes(j.status)?`<button class="text-button small" data-cancel-job="${j.id}">取消</button>`:''}${j.user_id?`<button class="text-button small" data-block-user="${j.user_id}">不再联系</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:empty('没有符合条件的记录','调整用户名、时间、任务或状态后重新筛选。')}</div><div class="pagination"><span>第 ${Math.floor(offset/50)+1} / ${Math.max(1,Math.ceil(r.total/50))} 页 · 每页 50 条</span><div class="actions"><button class="secondary small" id="prev-page" ${offset===0?'disabled':''}>上一页</button><button class="secondary small" id="next-page" ${offset+50>=r.total?'disabled':''}>下一页</button></div></div></section>`;
 }
 
 async function guards({data}={}) {
   const items = data ?? await api("/guards");
+  guardItems=items;
   return (
     heading(
       "不再联系",
       "名单中的用户会在实际发送前被拦截。",
       '<button id="new-guard">＋ 添加用户</button>',
     ) +
-    `<section class="panel">${items.length ? `<div class="table-wrap"><table><thead><tr><th>用户 ID</th><th>备注</th><th>操作</th></tr></thead><tbody>${items.map((g) => `<tr><td>${g.user_id}</td><td>${E(g.note || "—")}</td><td><button class="secondary small" data-remove-guard="${g.id}">移出名单</button></td></tr>`).join("")}</tbody></table></div>` : empty("名单为空", "可以从消息记录添加用户，也可以在这里输入 Telegram 用户 ID。")}</section>`
+    `<section class="panel" id="guards-panel">${items.length ? `<div class="table-wrap"><table><thead><tr><th>用户 ID</th><th>备注</th><th>操作</th></tr></thead><tbody>${items.map((g) => `<tr><td>${g.user_id}</td><td>${E(g.note || "—")}</td><td><button class="secondary small" data-remove-guard="${g.id}">移出名单</button></td></tr>`).join("")}</tbody></table></div>` : empty("名单为空", "可以从消息记录添加用户，也可以在这里输入 Telegram 用户 ID。")}</section>`
   );
 }
 async function ai({data}={}) { return workspaceAi(data); }
@@ -356,9 +370,8 @@ async function updateRecords(button, query) {
     const html = await records(query);
     if (revision !== renderRevision) return;
     // Commit applied filters only after success; failures retain the old page.
-    recordOffset = query.offset;
-    recordStatus = query.status;
-    recordSearch = query.search;
+    applyRecordQuery(query);
+    rememberRecordUrl();
     const scroll = [window.scrollX, window.scrollY];
     content.innerHTML = html;
     bindPage();
@@ -471,6 +484,7 @@ function receiveGroupsDialog(id) {
     updateAccountView(id, {receive_chat_ids:saved.chat_ids, dm_template:copy.template.trim(), dm_copy_options:{format:copy.format,image_id:copy.image_id}});
     toast("接收群组与私信文案已保存");
   });
+  watchForm($("#receive-groups-form"),copyValue);
 }
 function taskDialog(id, monitorId) {
   const t = state.tasks.find((t) => t.id === id) || {
@@ -571,7 +585,7 @@ function guardDialog(userId = "") {
     });
     $("#modal").close();
     toast("已加入不再联系名单");
-    await load();
+    await updateGuardList();
   });
 }
 function weightDialog(id) {
@@ -687,6 +701,8 @@ function bindPage() {
     $("#search-records").onclick = (e) => updateRecords(e.currentTarget, {
       search: $("#record-search").value,
       status: $("#record-status").value,
+      period: $("#record-period").value,
+      task: $("#record-task").value,
       offset: 0,
     });
   for (const [id, offset] of [
@@ -696,7 +712,7 @@ function bindPage() {
   ]) {
     if ($("#" + id)) $("#" + id).onclick = (e) => updateRecords(
       e.currentTarget,
-      { search: recordSearch, status: recordStatus, offset },
+      { ...currentRecordQuery(), offset },
     );
   }
   $$("[data-cancel-job]").forEach(
@@ -706,6 +722,7 @@ function bindPage() {
           b,
           () => api(`/records/${b.dataset.cancelJob}/cancel`, "POST"),
           "待发送消息已取消",
+          ()=>applyCancelledRecord(Number(b.dataset.cancelJob)),
         )),
   );
   $$("[data-block-user]").forEach(
@@ -720,9 +737,11 @@ function bindPage() {
             b,
             () => api(`/guards/${b.dataset.removeGuard}`, "DELETE"),
             "已移出名单",
+            ()=>removeGuardView(Number(b.dataset.removeGuard)),
           );
       }),
   );
+  $$("[data-diagnose-task]").forEach(b=>b.onclick=()=>taskDiagnostics(Number(b.dataset.diagnoseTask)));
   bindStructure();
   bindWorkspace();
   bindChannels();

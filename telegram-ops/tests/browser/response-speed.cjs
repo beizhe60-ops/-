@@ -9,13 +9,14 @@ const {server,state,calls,delay}=fixtures;
  const origin='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
  const p=await browser.newPage({viewport:{width:1440,height:1000}});
- const errors=[];p.on('pageerror',e=>errors.push(e.message));
+ p.on('dialog',d=>d.accept());
+  const errors=[];p.on('pageerror',e=>errors.push(e.message));
  const samples=[];
  async function measure(name,fn){const index=calls.length,begin=Date.now();await fn();samples.push({name,ms:Date.now()-begin,requests:calls.slice(index).map(c=>({path:c.path,method:c.method,startMs:c.start-begin,endMs:c.end?c.end-begin:null}))});}
  async function nav(name,title){await p.locator('nav [data-page="'+name+'"]').click();await p.locator('#content h1').filter({hasText:title}).waitFor();}
  await measure('cold_records',async()=>{await p.goto(origin+'/console/records');await p.locator('#content tbody tr').first().waitFor();});
  await measure('records_to_ai',()=>nav('ai','AI 群组分析'));
- await p.getByRole('tab',{name:'分析设置',exact:true}).click();
+ await p.getByRole('tab',{name:'分析设置',exact:true}).click();await p.locator('#ai-form .form-expand').click();
  await p.locator('#ai-form [name=message_count]').fill('60');
  await measure('save_ai',async()=>{await p.getByRole('button',{name:'保存摘要设置',exact:true}).click();await p.waitForFunction(()=>document.querySelector('#toast').textContent==='摘要设置已保存'&&document.querySelector('#ai-form [name=message_count]').value==='60');});
  await measure('ai_to_channels',()=>nav('channels','频道采编'));

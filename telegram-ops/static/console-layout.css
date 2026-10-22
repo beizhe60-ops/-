@@ -122,6 +122,8 @@ dialog:has(.record-detail) { max-width:780px; }
  .records-table th:nth-child(5) { width:110px; }
  .task-row > .actions { flex-shrink:1; }
 }
+
+
 @media(max-width:900px) {
  .saved-plan { grid-template-columns:1fr 1fr; }
  .home-status { grid-template-columns:1fr 1fr; }
@@ -176,4 +178,29 @@ dialog:has(.record-detail) { max-width:780px; }
  .workflow-entry:not(:last-child) { border-bottom:1px solid var(--line); }
  .home-resources { grid-template-columns:1fr; gap:18px; }
  .onboarding-steps { grid-template-columns:1fr; gap:18px; }
+}
+
+/* Task diagnostics and progressive configuration use the existing console palette. */
+.form-step { border:1px solid var(--line); border-radius:8px; margin:16px 0; background:#fff; }
+.form-step > summary { padding:16px 18px; font-weight:600; cursor:pointer; color:var(--ink,#243849); }
+.form-step[open] > summary { border-bottom:1px solid var(--line); }
+.form-step > .form-section,.form-step > .form-grid,.form-step > .copy-composer { padding:18px; margin:0!important; border:0; }
+.form-step:focus-within { border-color:#8fb9c0; }
+.form-expand { margin:0 0 8px auto; display:block; }
+.required-field > input,.required-field > textarea,.required-field > select { border-left:3px solid #087f8c; }
+.diagnostic-actions { margin-bottom:20px; }
+.diagnostic-summary { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+.diagnostic-summary > div { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:16px; background:#f4f7fa; border-radius:8px; }
+.diagnostic-summary span,.diagnostic-events small { font-size:12px; color:#64798b; }
+.diagnostic-events { max-height:420px; overflow:auto; }
+.diagnostic-events article { display:grid; grid-template-columns:150px minmax(0,1fr); gap:12px; border-bottom:1px solid var(--line); padding:12px 0; }
+.diagnostic-events article > span { font-size:12px; color:#64798b; }
+.diagnostic-events small { display:block; margin-top:6px; overflow-wrap:anywhere; }
+.record-filters { flex-wrap:wrap; }
+.record-filters select { width:auto; max-width:220px; }
+@media(max-width:760px) {
+ .form-step > summary,.form-step > .form-section,.form-step > .form-grid,.form-step > .copy-composer { padding:14px; }
+ .diagnostic-summary,.diagnostic-events article { grid-template-columns:1fr; }
+ .record-filters { grid-template-columns:minmax(0,1fr); }
+ .record-filters select { width:100%; max-width:none; }
 }

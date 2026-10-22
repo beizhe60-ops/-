@@ -6,15 +6,15 @@ let writeRequests = 0;
 const pageScroll = new Map();
 let displayedConsoleUrl = location.pathname + location.search;
 
-function recordPath({offset=recordOffset,status=recordStatus,search=recordSearch}={}) {
-  return `/records?status=${encodeURIComponent(status)}&q=${encodeURIComponent(search)}&offset=${offset}`;
+function recordPath(query=currentRecordQuery()) {
+  return `/records?${recordQueryUrl({...currentRecordQuery(),...query})}`;
 }
 function channelPath({status=channelFilter,feed=channelFeedFilter,offset=channelOffset}={}) {
   return `/channel-drafts?status=${status}&offset=${offset}${feed?'&feed_id='+Number(feed):''}`;
 }
-function readPageData(target) {
+function readPageData(target, url) {
   switch(target) {
-    case 'records': return api(recordPath());
+    case 'records': return api(recordPath(url?recordQueryFromUrl(url):currentRecordQuery()));
     case 'guards': return api('/guards');
     case 'broadcasts': return api('/broadcasts');
     case 'channels': return Promise.all([api('/channel-feeds'),api(channelPath())]);
@@ -78,13 +78,8 @@ async function navigateConsole(url, {pop=false}={}) {
     if(pop)history.pushState(null,'',displayedConsoleUrl);
     return;
   }
-  if($('#modal').open) {
-    if(channelDirty && !confirm('有尚未保存的正文修改，确定关闭？')) {
-      if(pop)history.pushState(null,'',displayedConsoleUrl);
-      return;
-    }
-    $('#modal').close();
-  }
+  if(!confirmLeave()){if(pop)history.pushState(null,'',displayedConsoleUrl);return;}
+  if($('#modal').open)$('#modal').close();
   const previousPage=page;
   pageScroll.set(page,[scrollX,scrollY]);
   const revision=++renderRevision;
@@ -97,7 +92,7 @@ async function navigateConsole(url, {pop=false}={}) {
     // Dedicated page results are always read, and expired state reads run in parallel.
     const [,data]=await Promise.all([
       !state || Date.now()-stateReadAt>=STATE_MAX_AGE_MS ? readState() : Promise.resolve(),
-      readPageData(target),
+      readPageData(target,url),
     ]);
     if(revision!==renderRevision)return;
     page=target;

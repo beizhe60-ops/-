@@ -52,22 +52,6 @@ function channelFeedDialog(feed=null) {
 }
 
 let channelDirty=false;
-function channelCloseGuard(e) {
-  if(!channelDirty)return;
-  if(e.type==='click' && e.target!==$('#close-modal') && e.target!==$('#modal'))return;
-  if(e.target===$('#modal') && e.type==='click'){
-    const r=$('#modal').getBoundingClientRect();if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom)return;
-  }
-  if(!confirm('有尚未保存的正文修改，确定关闭？')){e.preventDefault();e.stopImmediatePropagation();}
-  else channelDirty=false;
-}
-document.addEventListener('DOMContentLoaded',()=>{
-  $('#close-modal').addEventListener('click',channelCloseGuard,true);
-  $('#modal').addEventListener('click',channelCloseGuard,true);
-  $('#modal').addEventListener('cancel',channelCloseGuard);
-  $('#modal').addEventListener('close',()=>{channelDirty=false;$('#modal').classList.remove('channel-dialog');});
-});
-window.addEventListener('beforeunload',e=>{if(channelDirty){e.preventDefault();e.returnValue='';}});
 async function channelDraftDialog(id) {
   const d=await api(`/channel-drafts/${id}`), editable=['draft','failed'].includes(d.status), feed=channelFeeds.find(f=>f.id===d.feed_id);
   openModal('帖子草稿',`<div class="channel-draft-meta">${badge(d.status,channelStatuses[d.status])}<span>${date(d.source_date)}</span><a href="${E(channelSourceLink(d))}" target="_blank" rel="noopener noreferrer">打开原帖</a></div>${d.reason?`<p class="callout">${E(d.reason)}</p>`:''}<div class="channel-edit-layout"><section class="channel-original"><h3>原始内容</h3><div class="channel-original-text">${E(d.original_text||'此帖只有附件')}</div>${d.media.length?`<div class="channel-media">${d.media.map(m=>`<figure><img loading="lazy" src="/api/channel-drafts/${d.id}/thumbnail/${m.id}" alt="原帖${m.kind==='video'?'视频':'附件'}缩略图" onerror="this.hidden=true"><figcaption>${m.kind==='photo'?'图片':m.kind==='video'?'视频':'文件'} · ${m.id}</figcaption></figure>`).join('')}</div>`:''}</section><form id="channel-draft-form"><h3>${editable?'编辑发布内容':'已保存内容'}</h3>${editable?channelTextToolbar():''}<div id="channel-body" class="copy-editor channel-body" contenteditable="${editable}" role="textbox" aria-label="发布正文" aria-multiline="true"></div><div id="channel-link-fields" hidden><label>显示文字<input id="channel-link-text"></label><label>链接地址<input id="channel-link-url" placeholder="https://…"></label><button type="button" id="channel-link-insert" class="secondary small">插入链接</button></div>${d.media.length?`<label class="checkbox-label"><input id="channel-keep-media" type="checkbox" ${d.keep_media?'checked':''} ${editable?'':'disabled'}>保留原帖 ${d.media.length} 个附件（图片 / 视频 / 文件）</label>`:''}<small id="channel-length"></small><div class="channel-target">发布频道：<strong>${feed?.target_id?E(chatName(feed.target_id))+' ('+feed.target_id+')':'待配置'}</strong></div><div class="form-error" role="alert"></div><div class="form-footer">${editable?'<button type="submit">保存草稿</button><button type="button" id="channel-apply-layout" class="secondary">套用自动模板</button><button type="button" id="channel-preview" class="secondary">预览排版</button><button type="button" id="channel-publish">确认发布</button>':''}${['draft','filtered','failed'].includes(d.status)?'<button type="button" id="channel-discard" class="text-button">忽略此帖</button>':''}${['queued','waiting'].includes(d.status)?'<button type="button" id="channel-cancel" class="secondary">取消发布</button>':''}</div><p id="channel-save-feedback" role="status"></p><div id="channel-preview-box" class="channel-preview" hidden></div></form></div>`);

@@ -4,7 +4,7 @@ function workspaceHome() {
   const offline=state.accounts.filter(a=>!a.connected);
   return heading('工作台','先查看运行情况，再进入需要处理的任务。','<a class="button secondary" href="/console/records">查看消息记录</a>')+
     `<section class="home-status" aria-label="当前运行概况"><div><span class="status-dot ${state.running?'online':''}"></span><strong>${state.running?'后台服务运行中':'后台服务已暂停'}</strong><small>关闭网页不影响后台任务</small></div><a href="/console/accounts"><strong>${connected} / ${state.accounts.length}</strong><span>账号已连接</span></a><a href="/console/tasks"><strong>${state.tasks.filter(t=>t.enabled).length}</strong><span>监测任务已启用</span></a><a href="/console/records"><strong>${state.stats.pending||0}</strong><span>转发 / 私信待处理</span></a></section>
-    ${(offline.length||state.stats.failed||!state.application?.configured)?`<section class="attention-list" aria-label="需要关注"><strong>需要关注</strong>${!state.application?.configured?'<a href="/console/settings">完成 Telegram 连接配置</a>':''}${offline.length?`<a href="/console/accounts">${offline.length} 个账号尚未连接，查看账号状态</a>`:''}${state.stats.failed?`<a href="/console/records">${state.stats.failed} 条转发或私信失败 / 待核实，查看记录</a>`:''}</section>`:''}
+    ${(offline.length||state.stats.failed||!state.application?.configured)?`<section class="attention-list" aria-label="需要关注"><strong>需要关注</strong>${!state.application?.configured?'<a href="/console/settings">完成 Telegram 连接配置</a>':''}${offline.length?`<a href="/console/accounts">${offline.length} 个账号尚未连接，查看账号状态</a>`:''}${exceptionAttention()}</section>`:''}
     <div class="section-heading"><h2>常用功能</h2><span class="subtle">按要做的事情进入</span></div><section class="workflow-menu">${[
       ['broadcasts','群发任务','编辑通知，选择多个接收群，再预览发送。','↗'],
       ['tasks','监测转发','管理关键词转发，以及私信接收和文案。','⇄'],
@@ -54,7 +54,7 @@ async function broadcasts({data}={}) {
   broadcastItems=data ?? await api('/broadcasts');
   return heading('群发任务','编辑一条通知，发送到选定的多个群。每个任务只发送一轮。','<button id="new-broadcast">＋ 新建群发</button>')+
     (!state.running?'<div class="callout">服务已暂停。可以保存和预览任务，启动服务后才会发送。</div>':'')+
-    `<section class="panel"><div class="panel-head"><h2>最近群发任务</h2><button class="secondary small" id="refresh-workspace">刷新状态</button></div>${broadcastItems.length?broadcastItems.map(t=>`<article class="task-row"><div><div class="actions"><strong>${E(t.name)}</strong>${badge(t.status,campaignNames[t.status])}</div><p>${E(accountName(t.account_id))} · ${t.targets.length} 个群 · ${t.scheduled_at?date(t.scheduled_at):'启动后发送'}</p><p class="subtle">成功 ${t.counts.sent||0} · 待发送 ${(t.counts.pending||0)+(t.counts.waiting||0)} · 失败 / 待核实 ${(t.counts.failed||0)+(t.counts.unknown||0)}</p></div><div class="actions"><button class="secondary small" data-campaign-preview="${t.id}">查看内容</button><button class="secondary small" data-campaign-records="${t.id}">发送记录</button>${['draft','paused'].includes(t.status)?`<button class="small" data-campaign-start="${t.id}">${t.status==='draft'?'预览并启动':'继续发送'}</button>`:''}${t.status==='queued'?`<button class="secondary small" data-campaign-pause="${t.id}">暂停</button>`:''}${['draft','paused','queued'].includes(t.status)?`<button class="text-button small" data-campaign-cancel="${t.id}">取消任务</button>`:''}</div></article>`).join(''):empty('创建第一条群发通知','选择发送账号和接收群，预览内容后再启动。')}</section><p class="subtle">暂停或取消只影响尚未发送的内容；发送结果不确定时会保留记录，不自动重发。</p>`;
+    `<section class="panel" id="campaigns-panel"><div class="panel-head"><h2>最近群发任务</h2><button class="secondary small" id="refresh-workspace">刷新状态</button></div>${broadcastItems.length?broadcastItems.map(t=>`<article class="task-row" data-campaign-row="${t.id}"><div><div class="actions"><strong>${E(t.name)}</strong>${badge(t.status,campaignNames[t.status])}</div><p>${E(accountName(t.account_id))} · ${t.targets.length} 个群 · ${t.scheduled_at?date(t.scheduled_at):'启动后发送'}</p><p class="subtle">成功 ${t.counts.sent||0} · 待发送 ${(t.counts.pending||0)+(t.counts.waiting||0)} · 失败 / 待核实 ${(t.counts.failed||0)+(t.counts.unknown||0)}</p></div><div class="actions"><button class="secondary small" data-campaign-preview="${t.id}">查看内容</button><button class="secondary small" data-campaign-records="${t.id}">发送记录</button>${['draft','paused'].includes(t.status)?`<button class="small" data-campaign-start="${t.id}">${t.status==='draft'?'预览并启动':'继续发送'}</button>`:''}${t.status==='queued'?`<button class="secondary small" data-campaign-pause="${t.id}">暂停</button>`:''}${['draft','paused','queued'].includes(t.status)?`<button class="text-button small" data-campaign-cancel="${t.id}">取消任务</button>`:''}</div></article>`).join(''):empty('创建第一条群发通知','选择发送账号和接收群，预览内容后再启动。')}</section><p class="subtle">暂停或取消只影响尚未发送的内容；发送结果不确定时会保留记录，不自动重发。</p>`;
 }
 function broadcastDialog(){
   const accounts=state.accounts.filter(a=>a.has_session);
@@ -65,12 +65,12 @@ function broadcastDialog(){
   $('#broadcast-form [name=timing]').onchange=e=>{$('#campaign-time').hidden=e.target.value!=='scheduled';$('#campaign-time input').required=e.target.value==='scheduled';};
   setupForm('#broadcast-form',async fd=>{
     const result=await api('/broadcasts','POST',{request_key:requestKey,name:fd.get('name'),account_id:Number(fd.get('account_id')),targets:parseGroupIds(fd.get('targets')),text:fd.get('text'),scheduled_at:fd.get('timing')==='scheduled'?fd.get('scheduled_at')+':00+08:00':null});
-    await load({refreshState:false}); campaignPreview(result,true);
+    await applyCampaign(result); campaignPreview(result,true);
   });
 }
 function campaignPreview(t, start=false){
   openModal(start?'确认群发内容':'群发内容',`<p><strong>${E(t.name)}</strong></p><p>发送账号：${E(accountName(t.account_id))}</p><p>接收群：${t.targets.map(id=>E(chatName(id))+' ('+id+')').join('、')}</p><p>发送时间：${t.scheduled_at?date(t.scheduled_at):'启动后发送'}</p><div class="preview-box">${E(t.text)}</div><p class="subtle">${state.running?'启动后将按任务时间逐群发送。':'服务已暂停；任务启动后等待服务恢复。'}</p>${start?'<div class="form-error" role="alert" id="campaign-error"></div><div class="form-footer"><button id="launch-campaign">确认启动群发</button></div>':''}`);
-  if(start)$('#launch-campaign').onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{await api(`/broadcasts/${t.id}/start`,'POST');$('#modal').close();await load({refreshState:false});toast('群发任务已启动');}catch(ex){$('#campaign-error').textContent=ex.message;b.disabled=false;}};
+  if(start)$('#launch-campaign').onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{const saved=await api(`/broadcasts/${t.id}/start`,'POST');$('#modal').close();await applyCampaign(saved);toast('群发任务已启动');}catch(ex){$('#campaign-error').textContent=ex.message;b.disabled=false;}};
 }
 
 async function workspaceAi(data){
@@ -88,7 +88,7 @@ function bindWorkspace(){
   if($('#refresh-workspace'))$('#refresh-workspace').onclick=e=>action(e.currentTarget,async()=>{},'已刷新');
   $$('[data-campaign-preview]').forEach(b=>b.onclick=()=>campaignPreview(broadcastItems.find(t=>t.id===Number(b.dataset.campaignPreview))));
   $$('[data-campaign-start]').forEach(b=>b.onclick=()=>campaignPreview(broadcastItems.find(t=>t.id===Number(b.dataset.campaignStart)),true));
-  for(const name of ['pause','cancel'])$$(`[data-campaign-${name}]`).forEach(b=>b.onclick=()=>{if(name==='cancel'&&!confirm('取消尚未发送的内容？已经发送的消息会保留。'))return;action(b,()=>api(`/broadcasts/${b.getAttribute('data-campaign-'+name)}/${name}`,'POST'),'群发状态已更新');});
+  for(const name of ['pause','cancel'])$$(`[data-campaign-${name}]`).forEach(b=>b.onclick=()=>{if(name==='cancel'&&!confirm('取消尚未发送的内容？已经发送的消息会保留。'))return;action(b,()=>api(`/broadcasts/${b.getAttribute('data-campaign-'+name)}/${name}`,'POST'),'群发状态已更新',applyCampaign);});
   $$('[data-campaign-records]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const rows=await api(`/broadcasts/${b.dataset.campaignRecords}/records`);openModal('逐群发送记录',rows.map(r=>`<div class="task-row"><div><strong>${E(chatName(r.chat_id))}</strong><p>${r.chat_id} · ${E(labels[r.status]||r.status)}</p><p>${E(r.error||'')}</p><small>${date(r.sent_at)}</small></div></div>`).join('')||'<p>任务仍为草稿，尚未开始发送。</p>');}catch(ex){toast(ex.message);}finally{b.disabled=false;}});
   if(!$('#ai-form'))return;
   bindAiActions();

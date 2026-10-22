@@ -1,9 +1,9 @@
 import json
 import asyncio
 import contextlib
-from typing import Annotated
+from typing import Annotated, Literal
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
@@ -26,6 +26,7 @@ from app.message_copy import CopyInput, validate_copy
 from app.relay_engine import manager
 from app.workers import send_login_code, verify_login_code, sync_account_chats
 from app.telegram_client import make_client, CONNECT_TIMEOUT_SECONDS
+from app.console_records import exception_totals, filtered_records, record_tasks
 
 router = APIRouter()
 
@@ -473,6 +474,7 @@ def state(db: Session = Depends(get_db)):
     tasks = db.query(RelayTask).filter(RelayTask.deleted_at.is_(None)).order_by(RelayTask.id.desc()).all()
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     application = application_settings(db)
+    exceptions = exception_totals(db)
     return dict(
         running=manager.running,
         accounts=accounts_json(accounts, db),
@@ -504,9 +506,8 @@ def state(db: Session = Depends(get_db)):
                 RelayJob.sent_at >= today,
             )
             .count(),
-            failed=db.query(RelayJob)
-            .filter(RelayJob.status.in_(["failed", "unknown"]))
-            .count(),
+            failed=sum(exceptions.values()),
+            exceptions=exceptions,
         ),
     )
 
@@ -770,17 +771,17 @@ def preview(data: PreviewInput):
 
 @router.get("/api/records")
 def records(
-    status: str = "", q: str = "", offset: int = 0, db: Session = Depends(get_db)
+    status: str = "", q: str = "", offset: int = 0,
+    period: Literal["all", "today", "7d"] = "all",
+    task_id: Annotated[int | None, Query(gt=0)] = None,
+    db: Session = Depends(get_db),
 ):
-    query = db.query(RelayJob)
-    if status:
-        query = query.filter(RelayJob.status == status)
-    if q:
-        query = query.filter(RelayJob.username.contains(q.lstrip("@"), autoescape=True))
+    query = filtered_records(db, status, q, period, task_id)
     total = query.count()
     rows = query.order_by(RelayJob.id.desc()).offset(max(0, offset)).limit(RECORDS_PAGE_SIZE).all()
     return {
         "total": total,
+        "tasks": record_tasks(db),
         "items": [
             {
                 k: getattr(j, k)

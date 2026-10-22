@@ -6,6 +6,7 @@ let recordItems = [];
 function readViewRoute(url) {
   const target=url.pathname.split('/')[2];
   const view=url.searchParams.get('view');
+  if(target==='records')applyRecordQuery(recordQueryFromUrl(url));
   if(sectionChoices[target]?.includes(view))pageSections[target]=view;
   if(target==='tasks' && url.searchParams.has('account')) {
     const id=url.searchParams.get('account');

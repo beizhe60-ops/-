@@ -412,9 +412,11 @@ class RelayEngine:
     async def on_message(self, account_id, event):
         self.note_message(account_id, event, "received")
         if not self.running or not (event.is_group or event.is_channel):
+            self.note_message(account_id, event, "service_paused" if not self.running else "not_group")
             return
         text = event.raw_text or ""
         if not text.strip():
+            self.note_message(account_id, event, "empty_text")
             return
         with session_scope() as db:
             tasks = db.query(RelayTask).filter(RelayTask.enabled.is_(True)).all()
@@ -450,6 +452,13 @@ class RelayEngine:
                         text=text[:12000],
                     ))
         for task in tasks:
+            if account_id == task.account_a and int(event.chat_id) in json.loads(task.source_chats):
+                if task.relay_chat is None:
+                    self.note_message(account_id, event, "missing_target", task.id)
+                elif int(event.chat_id) not in monitor_ids:
+                    self.note_message(account_id, event, "outside_monitor_scope", task.id)
+                elif event.out:
+                    self.note_message(account_id, event, "outgoing_message", task.id)
             if task.relay_chat is None:
                 continue
             if (

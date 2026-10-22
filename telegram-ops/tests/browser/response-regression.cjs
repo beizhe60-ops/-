@@ -13,6 +13,7 @@ const f=require('./response-fixture.cjs');
  for(const mobile of [false,true]){
   const p=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1440,height:1000}});
   await p.addInitScript(()=>{const interval=window.setInterval;window.setInterval=(fn,ms,...args)=>ms===15000?0:interval(fn,ms,...args)});
+  p.on('dialog',d=>d.accept());
   const errors=[];p.on('pageerror',e=>errors.push(e.message));
   let documents=0;p.on('request',r=>{if(r.isNavigationRequest())documents++;});
   const count=route=>f.calls.filter(c=>c.path===route).length;
@@ -61,7 +62,7 @@ const f=require('./response-fixture.cjs');
   assert.equal(f.state.tasks[0].enabled,true);assert.equal(count('/api/state'),beforeToggle);
   assert(await p.evaluate(()=>otherTask===document.querySelector('[data-task-row="2"]')));
   // AI save keeps the form, selection and later edits; no second settings read.
-  await nav('ai','AI 群组分析');await p.getByRole('tab',{name:'分析设置',exact:true}).click();const settingsReads=count('/api/ai/settings');
+  await nav('ai','AI 群组分析');await p.getByRole('tab',{name:'分析设置',exact:true}).click();await p.locator('#ai-form .form-expand').click();const settingsReads=count('/api/ai/settings');
   await p.evaluate(()=>{window.originalForm=document.querySelector('#ai-form')});
   await p.locator('#ai-form [name=message_count]').fill('70');
   const aiWrite=f.holdNext('/api/ai/settings');const saved=p.waitForRequest(r=>r.method()==='PUT'&&r.url().endsWith('/api/ai/settings'));
