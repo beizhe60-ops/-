@@ -70,3 +70,14 @@ def add_channel_automation(engine):
             existing = {c['name'] for c in inspect(conn).get_columns(table)}
             for column in additions:
                 if column.name not in existing:ops.add_column(table,column)
+
+
+def add_channel_styles(engine):
+    """Add default layout choices without rewriting any saved or published posts."""
+    from sqlalchemy import Column, String
+    with engine.begin() as conn:
+        ops = Operations(MigrationContext.configure(conn))
+        existing = {c['name'] for c in inspect(conn).get_columns('channel_feeds')}
+        for name, default in [('emoji_style', 'alert'), ('body_format', 'normal')]:
+            if name not in existing:
+                ops.add_column('channel_feeds', Column(name, String(16), nullable=False, server_default=default))

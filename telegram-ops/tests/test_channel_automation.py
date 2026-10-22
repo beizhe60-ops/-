@@ -37,12 +37,12 @@ def test_template_source_fields_and_escaping_without_inferred_amounts():
     source='付款 300u 后未交付，之后又要求 100u。\n重复提醒\n重复提醒\n\n👤\n123456789\n👦🏻 示例用户\n🌐 @example_person\n🇨🇳 Chinese\n🕑 最後同步時間 01/01/2026\n\n👤 987654321\n👦🏻 第二个用户\n🌐 @second_person\n<script>alert(1)</script>'
     markup=format_channel_post(source,'曝光档案',2,datetime(2026,10,22,16,1),'https://t.me/qt00/11',True)
     text,entities,_=prepare_post(markup,allow_split=True)
-    assert '2026.10.23' in text and '#0002' in text
+    assert '2026.10.23' in text and '#0002' not in text
     assert '300u' in text and '100u' in text and '涉及金额' not in text
     assert text.count('重复提醒')==1 and 'Chinese' not in text and '最後同步時間' not in text
     assert 'Telegram ID：123456789' in text and '@example_person' in text and '@second_person' in text
     assert '<script>alert(1)</script>' in text and '<script>' not in markup
-    assert '原帖附件已保留' in text
+    assert '原帖附件已保留' not in text and '查看原始信息' not in text
 
 
 def test_labeled_fields_keep_original_unit_and_hide_missing_fields():

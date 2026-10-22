@@ -79,7 +79,7 @@ def ingest(db, feed, messages):
                 db.flush()
                 draft.automatic, draft.config_revision = True, feed.revision
                 draft.body_html = format_channel_post(text,feed.template_title,draft.id,source_date,
-                    source_link(feed.source,feed.source_id,rows[0].id),bool(media))
+                    source_link(feed.source,feed.source_id,rows[0].id),bool(media),emoji_style=feed.emoji_style,body_format=feed.body_format)
                 try:
                     prepare_post(draft.body_html,bool(media),allow_split=True)
                     if feed.target_id and feed.target_id != feed.source_id:
@@ -237,7 +237,7 @@ async def publish_next(manager, account_id):
                     caption,caption_entities=text,entities
                     remaining=[]
                 else:
-                    caption,caption_entities='📎 原帖附件 · 完整内容见后续消息',[]
+                    caption,caption_entities='',[]
                     remaining=list(split_post(text,entities))
                 if not still_current():
                     status,reason='draft','发布前设置发生变化，此帖保留在草稿'

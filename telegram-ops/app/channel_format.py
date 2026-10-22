@@ -4,6 +4,12 @@ import html
 import re
 from datetime import timezone
 from zoneinfo import ZoneInfo
+from typing import Literal
+
+EmojiStyle = Literal["alert", "lively", "minimal"]
+BodyFormat = Literal["normal", "bold", "italic", "underline", "strike", "quote", "code", "spoiler"]
+BODY_TAGS = dict(bold="b", italic="i", underline="u", strike="del", quote="blockquote", code="code", spoiler="tg-spoiler")
+STYLE_ICONS = {"alert": ("⚠️ ", "📝 ", "👤 ", "💰 "), "lively": ("🚨 ", "📣 ", "🔎 ", "🧾 "), "minimal": ("", "", "", "")}
 
 
 def units(text):
@@ -15,7 +21,7 @@ def source_link(source, source_id, message_id):
     return f'https://t.me/{name}/{message_id}'
 
 
-def format_channel_post(text, title, case_id, source_date, url, has_media=False):
+def format_channel_post(text, title, case_id, source_date, url, has_media=False, *, emoji_style="alert", body_format="normal"):
     lines = text.replace('\r\n','\n').replace('\r','\n').split('\n')
     body, people, fields = [], [], []
     current = None
@@ -53,8 +59,13 @@ def format_channel_post(text, title, case_id, source_date, url, has_media=False)
     narrative='\n'.join(body).strip()
     when=source_date.replace(tzinfo=timezone.utc) if source_date.tzinfo is None else source_date
     date=when.astimezone(ZoneInfo('Asia/Shanghai')).strftime('%Y.%m.%d')
-    parts=[f'⚠️ <b>{html.escape(title)} #{case_id:04d}</b>\n{date} · #曝光记录']
-    if narrative:parts.append('<b>事件经过</b>\n'+html.escape(narrative))
+    icons = STYLE_ICONS[emoji_style]
+    parts=[f'{icons[0]}<b>{html.escape(title)}</b>\n{date} · #曝光记录']
+    if narrative:
+        content = html.escape(narrative)
+        tag = BODY_TAGS.get(body_format)
+        if tag: content = f'<{tag}>'+content+f'</{tag}>'
+        parts.append(icons[1]+'<b>事件经过</b>\n'+content)
     if people:
         rows=[]
         for person in people:
@@ -68,17 +79,13 @@ def format_channel_post(text, title, case_id, source_date, url, has_media=False)
                 values.append(label+'：<code>'+html.escape(person['id'])+'</code>')
             if person.get('note'):values.append('备注：'+html.escape(person['note']))
             if values:rows.append('\n'.join(values))
-        if rows:parts.append('<b>涉及账号</b>\n'+'\n\n'.join(rows))
+        if rows:parts.append(icons[2]+'<b>涉及账号</b>\n'+'\n\n'.join(rows))
     if fields:
         rows=[]
         for label,value in dict.fromkeys(fields):
             value=html.escape(value)
             rows.append(label+'：'+ ('\n<code>'+value+'</code>' if label=='相关地址' else '<b>'+value+'</b>' if '金额' in label else value))
-        parts.append('<b>交易信息</b>\n'+'\n'.join(rows))
-    footer='────────────'
-    if has_media:footer+='\n📎 原帖附件已保留'
-    footer+='\n<a href="'+html.escape(url,quote=True)+'">查看原始信息</a>'
-    parts.append(footer)
+        parts.append(icons[3]+'<b>交易信息</b>\n'+'\n'.join(rows))
     return '\n\n'.join(parts)
 
 

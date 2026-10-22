@@ -15,7 +15,7 @@ from app.database import get_db, session_scope
 from app.models import Account
 from app.channel_models import ChannelFeed, ChannelDraft
 from app.channel_rules import DEFAULT_AD_TERMS, filter_post, prepare_post, terms
-from app.channel_format import format_channel_post, source_link, split_post, units
+from app.channel_format import EmojiStyle, BodyFormat, format_channel_post, source_link, split_post, units
 from app.channel_service import available, source_peer, set_wait, READ_TIMEOUT
 from app.message_copy import normalize_image
 
@@ -31,6 +31,8 @@ class FeedInput(BaseModel):
     exclude_terms: str = Field(default='七天',max_length=4000)
     auto_publish: bool = Field(default=False,strict=True)
     template_title: str = Field(default='曝光档案',min_length=1,max_length=60)
+    emoji_style: EmojiStyle = 'alert'
+    body_format: BodyFormat = 'normal'
     filter_ads: bool = Field(default=True,strict=True)
     ad_terms: str = Field(default=DEFAULT_AD_TERMS,max_length=4000)
 
@@ -81,7 +83,7 @@ def required(db, model, key):
 
 def feed_payload(db,feed):
     counts = dict(db.query(ChannelDraft.status,func.count(ChannelDraft.id)).filter_by(feed_id=feed.id).group_by(ChannelDraft.status).all())
-    return {k:getattr(feed,k) for k in ('id','name','account_id','source','source_id','source_title','target_id','exclude_terms','ad_terms','filter_ads','auto_publish','template_title','enabled','revision','started_at','checked_at','error')} | dict(counts=counts)
+    return {k:getattr(feed,k) for k in ('id','name','account_id','source','source_id','source_title','target_id','exclude_terms','ad_terms','filter_ads','auto_publish','template_title','emoji_style','body_format','enabled','revision','started_at','checked_at','error')} | dict(counts=counts)
 
 
 def draft_payload(draft, detail=False):
@@ -111,7 +113,7 @@ async def save_feed(data:FeedInput, feed_id:int|None=None, db:Session=Depends(ge
     if data.target_id and feed.source_id==data.target_id:
         raise HTTPException(422,'来源频道和发布频道需要分别设置')
     for key,value in data.model_dump().items():
-        if feed_id and key in ('auto_publish','template_title') and key not in data.model_fields_set:
+        if feed_id and key in ('auto_publish','template_title','emoji_style','body_format') and key not in data.model_fields_set:
             continue  # Older clients omit the new options; preserve the saved mode.
         setattr(feed,key,value)
     feed.enabled,feed.error = False,None
@@ -182,6 +184,8 @@ def filter_preview(data:FilterInput):
 class LayoutInput(BaseModel):
     text: str = Field(default='',max_length=12000)
     template_title: str = Field(default='曝光档案',min_length=1,max_length=60)
+    emoji_style: EmojiStyle = 'alert'
+    body_format: BodyFormat = 'normal'
     has_media: bool = Field(default=False,strict=True)
 
 
@@ -189,7 +193,7 @@ class LayoutInput(BaseModel):
 def layout_preview(data:LayoutInput):
     title=data.template_title.strip()
     if not title:raise HTTPException(422,'请填写模板标题')
-    body=format_channel_post(data.text,title,1,datetime.utcnow(),'https://t.me/qt00/1',data.has_media)
+    body=format_channel_post(data.text,title,1,datetime.utcnow(),'https://t.me/qt00/1',data.has_media,emoji_style=data.emoji_style,body_format=data.body_format)
     try:text,entities,clean=prepare_post(body,data.has_media,allow_split=True)
     except ValueError as exc:raise HTTPException(422,str(exc))
     return dict(html=clean,text=text,split_body=data.has_media and units(text)>1024,text_parts=len(list(split_post(text,entities))))
@@ -242,7 +246,7 @@ async def draft_action(draft_id:int,action:str,data:VersionInput,db:Session=Depe
         if draft.status not in ('draft','failed'):raise HTTPException(409,'仅可给尚未发布的草稿套用模板')
         feed=required(db,ChannelFeed,draft.feed_id)
         draft.body_html=format_channel_post(draft.original_text,feed.template_title,draft.id,draft.source_date,
-            source_link(feed.source,draft.source_id,json.loads(draft.message_ids)[0]),draft.keep_media and bool(json.loads(draft.media)))
+            source_link(feed.source,draft.source_id,json.loads(draft.message_ids)[0]),draft.keep_media and bool(json.loads(draft.media)),emoji_style=feed.emoji_style,body_format=feed.body_format)
         try:prepare_post(draft.body_html,draft.keep_media and bool(json.loads(draft.media)),allow_split=True)
         except ValueError as exc:raise HTTPException(422,str(exc))
         draft.status,draft.reason,draft.automatic='draft',None,False

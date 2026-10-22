@@ -21,6 +21,8 @@ class ChannelFeed(Base, TimestampMixin):
     filter_ads: Mapped[bool] = mapped_column(Boolean, default=True)
     auto_publish: Mapped[bool] = mapped_column(Boolean, default=False, server_default='0')
     template_title: Mapped[str] = mapped_column(String(60), default='曝光档案', server_default='曝光档案')
+    emoji_style: Mapped[str] = mapped_column(String(16), default='alert', server_default='alert')
+    body_format: Mapped[str] = mapped_column(String(16), default='normal', server_default='normal')
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     cursor: Mapped[int] = mapped_column(Integer, default=0)
     revision: Mapped[int] = mapped_column(Integer, default=1)

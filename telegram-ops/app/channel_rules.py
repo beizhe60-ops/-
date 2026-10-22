@@ -1,8 +1,7 @@
 """Deterministic filtering and the restricted Telegram editor format."""
 import re
 import unicodedata
-from telethon.extensions import html as telegram_html
-from app.message_copy import SafeHtml
+from app.channel_markup import parse_channel_html
 
 DEFAULT_AD_TERMS = '广告合作\n广告招商\n广告位招租\n付费推广\n商务合作\n推广合作'
 
@@ -30,13 +29,7 @@ def filter_post(text, exclude_terms, filter_ads, ad_terms):
 
 
 def prepare_post(markup, with_media=False, *, allow_split=False):
-    parser = SafeHtml()
-    parser.feed(markup)
-    parser.close()
-    if parser.stack:
-        raise ValueError('文字格式没有正确闭合')
-    clean = ''.join(parser.parts)
-    text, entities = telegram_html.parse(clean)
+    text, entities, clean = parse_channel_html(markup)
     limit = 20000 if allow_split else (1024 if with_media else 4096)
     if len(text.encode('utf-16-le')) // 2 > limit:
         raise ValueError(f'正文过长，当前格式上限为 {limit} 字符；请精简正文或移除原附件')
