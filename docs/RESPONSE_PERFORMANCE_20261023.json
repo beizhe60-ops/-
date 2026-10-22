@@ -1,0 +1,388 @@
+{
+  "date": "2026-10-23",
+  "baseline_commit": "053c8df4c05bc95ccd9668ce0c4a889acd552e24",
+  "before": {
+    "apiDelayMs": 500,
+    "samples": [
+      {
+        "name": "cold_records",
+        "ms": 1361,
+        "requests": [
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 43,
+            "endMs": 546
+          },
+          {
+            "path": "/api/records",
+            "method": "GET",
+            "startMs": 551,
+            "endMs": 1053
+          }
+        ]
+      },
+      {
+        "name": "records_to_ai",
+        "ms": 1350,
+        "requests": [
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 40,
+            "endMs": 542
+          },
+          {
+            "path": "/api/ai/settings",
+            "method": "GET",
+            "startMs": 547,
+            "endMs": 1049
+          },
+          {
+            "path": "/api/ai/activity",
+            "method": "GET",
+            "startMs": 548,
+            "endMs": 1050
+          }
+        ]
+      },
+      {
+        "name": "save_ai",
+        "ms": 1578,
+        "requests": [
+          {
+            "path": "/api/ai/settings",
+            "method": "PUT",
+            "startMs": 36,
+            "endMs": 537
+          },
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 541,
+            "endMs": 1043
+          },
+          {
+            "path": "/api/ai/settings",
+            "method": "GET",
+            "startMs": 1047,
+            "endMs": 1547
+          },
+          {
+            "path": "/api/ai/activity",
+            "method": "GET",
+            "startMs": 1047,
+            "endMs": 1550
+          }
+        ]
+      },
+      {
+        "name": "ai_to_channels",
+        "ms": 1355,
+        "requests": [
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 55,
+            "endMs": 557
+          },
+          {
+            "path": "/api/channel-feeds",
+            "method": "GET",
+            "startMs": 565,
+            "endMs": 1065
+          },
+          {
+            "path": "/api/channel-drafts",
+            "method": "GET",
+            "startMs": 565,
+            "endMs": 1065
+          }
+        ]
+      },
+      {
+        "name": "save_channel",
+        "ms": 1824,
+        "requests": [
+          {
+            "path": "/api/channel-feeds/1",
+            "method": "PUT",
+            "startMs": 28,
+            "endMs": 528
+          },
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 534,
+            "endMs": 1035
+          },
+          {
+            "path": "/api/channel-feeds",
+            "method": "GET",
+            "startMs": 1040,
+            "endMs": 1540
+          },
+          {
+            "path": "/api/channel-drafts",
+            "method": "GET",
+            "startMs": 1040,
+            "endMs": 1541
+          }
+        ]
+      },
+      {
+        "name": "channels_to_accounts",
+        "ms": 858,
+        "requests": [
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 56,
+            "endMs": 558
+          }
+        ]
+      },
+      {
+        "name": "save_weight",
+        "ms": 1045,
+        "requests": [
+          {
+            "path": "/api/accounts/2/weight",
+            "method": "PUT",
+            "startMs": 29,
+            "endMs": 529
+          },
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 534,
+            "endMs": 1035
+          }
+        ]
+      },
+      {
+        "name": "accounts_to_tasks",
+        "ms": 861,
+        "requests": [
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 64,
+            "endMs": 566
+          }
+        ]
+      },
+      {
+        "name": "save_task",
+        "ms": 1377,
+        "requests": [
+          {
+            "path": "/api/tasks/1",
+            "method": "PUT",
+            "startMs": 42,
+            "endMs": 543
+          },
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 555,
+            "endMs": 1057
+          }
+        ]
+      }
+    ],
+    "errors": [],
+    "scope": "Local browser, fictional API responses; no Telegram or AI calls"
+  },
+  "after": {
+    "apiDelayMs": 500,
+    "samples": [
+      {
+        "name": "cold_records",
+        "ms": 841,
+        "requests": [
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 34,
+            "endMs": 535
+          },
+          {
+            "path": "/api/records",
+            "method": "GET",
+            "startMs": 34,
+            "endMs": 536
+          }
+        ]
+      },
+      {
+        "name": "records_to_ai",
+        "ms": 824,
+        "requests": [
+          {
+            "path": "/api/ai/settings",
+            "method": "GET",
+            "startMs": 17,
+            "endMs": 517
+          },
+          {
+            "path": "/api/ai/activity",
+            "method": "GET",
+            "startMs": 17,
+            "endMs": 518
+          }
+        ]
+      },
+      {
+        "name": "save_ai",
+        "ms": 559,
+        "requests": [
+          {
+            "path": "/api/ai/settings",
+            "method": "PUT",
+            "startMs": 46,
+            "endMs": 548
+          },
+          {
+            "path": "/api/ai/activity",
+            "method": "GET",
+            "startMs": 550,
+            "endMs": null
+          }
+        ]
+      },
+      {
+        "name": "ai_to_channels",
+        "ms": 834,
+        "requests": [
+          {
+            "path": "/api/channel-feeds",
+            "method": "GET",
+            "startMs": 35,
+            "endMs": 538
+          },
+          {
+            "path": "/api/channel-drafts",
+            "method": "GET",
+            "startMs": 35,
+            "endMs": 538
+          }
+        ]
+      },
+      {
+        "name": "save_channel",
+        "ms": 817,
+        "requests": [
+          {
+            "path": "/api/channel-feeds/1",
+            "method": "PUT",
+            "startMs": 27,
+            "endMs": 529
+          },
+          {
+            "path": "/api/channel-drafts",
+            "method": "GET",
+            "startMs": 538,
+            "endMs": null
+          }
+        ]
+      },
+      {
+        "name": "channels_to_accounts",
+        "ms": 29,
+        "requests": []
+      },
+      {
+        "name": "save_weight",
+        "ms": 547,
+        "requests": [
+          {
+            "path": "/api/accounts/2/weight",
+            "method": "PUT",
+            "startMs": 31,
+            "endMs": 533
+          }
+        ]
+      },
+      {
+        "name": "accounts_to_tasks",
+        "ms": 827,
+        "requests": [
+          {
+            "path": "/api/state",
+            "method": "GET",
+            "startMs": 33,
+            "endMs": 536
+          }
+        ]
+      },
+      {
+        "name": "save_task",
+        "ms": 857,
+        "requests": [
+          {
+            "path": "/api/tasks/1",
+            "method": "PUT",
+            "startMs": 29,
+            "endMs": 531
+          }
+        ]
+      }
+    ],
+    "errors": [],
+    "scope": "Local browser, fictional API responses; no Telegram or AI calls"
+  },
+  "live_read_samples": {
+    "scope": "Read-only authenticated API samples from this computer; no settings changed",
+    "results": [
+      {
+        "path": "/api/state",
+        "samples_ms": [
+          623,
+          861
+        ],
+        "bytes": 8747
+      },
+      {
+        "path": "/api/records",
+        "samples_ms": [
+          1035,
+          1039
+        ],
+        "bytes": 34496
+      },
+      {
+        "path": "/api/ai/settings",
+        "samples_ms": [
+          735,
+          552
+        ],
+        "bytes": 350
+      },
+      {
+        "path": "/api/ai/activity",
+        "samples_ms": [
+          724,
+          540
+        ],
+        "bytes": 1225
+      },
+      {
+        "path": "/api/channel-feeds",
+        "samples_ms": [
+          723,
+          744
+        ],
+        "bytes": 549
+      },
+      {
+        "path": "/api/channel-drafts",
+        "samples_ms": [
+          533,
+          551
+        ],
+        "bytes": 1005
+      }
+    ]
+  }
+}
