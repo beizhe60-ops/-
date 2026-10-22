@@ -15,6 +15,7 @@ from app.database import get_db, session_scope
 from app.models import Account
 from app.channel_models import ChannelFeed, ChannelDraft
 from app.channel_rules import DEFAULT_AD_TERMS, filter_post, prepare_post, terms
+from app.channel_format import format_channel_post, source_link, split_post, units
 from app.channel_service import available, source_peer, set_wait, READ_TIMEOUT
 from app.message_copy import normalize_image
 
@@ -28,6 +29,8 @@ class FeedInput(BaseModel):
     source: str = Field(default='qt00',min_length=1,max_length=100)
     target_id: GroupId | None = None
     exclude_terms: str = Field(default='七天',max_length=4000)
+    auto_publish: bool = Field(default=False,strict=True)
+    template_title: str = Field(default='曝光档案',min_length=1,max_length=60)
     filter_ads: bool = Field(default=True,strict=True)
     ad_terms: str = Field(default=DEFAULT_AD_TERMS,max_length=4000)
 
@@ -40,7 +43,7 @@ class FeedInput(BaseModel):
         if re.fullmatch(r'-[1-9]\d{0,15}',value) and -(2**52)<=int(value)<0: return value
         raise ValueError('请填写公开频道链接、@用户名或完整负数频道 ID')
 
-    @field_validator('name')
+    @field_validator('name','template_title')
     @classmethod
     def name_nonblank(cls,value):
         if not value.strip(): raise ValueError('请填写采集名称')
@@ -78,12 +81,12 @@ def required(db, model, key):
 
 def feed_payload(db,feed):
     counts = dict(db.query(ChannelDraft.status,func.count(ChannelDraft.id)).filter_by(feed_id=feed.id).group_by(ChannelDraft.status).all())
-    return {k:getattr(feed,k) for k in ('id','name','account_id','source','source_id','source_title','target_id','exclude_terms','ad_terms','filter_ads','enabled','revision','started_at','checked_at','error')} | dict(counts=counts)
+    return {k:getattr(feed,k) for k in ('id','name','account_id','source','source_id','source_title','target_id','exclude_terms','ad_terms','filter_ads','auto_publish','template_title','enabled','revision','started_at','checked_at','error')} | dict(counts=counts)
 
 
 def draft_payload(draft, detail=False):
     media = json.loads(draft.media)
-    value = {k:getattr(draft,k) for k in ('id','feed_id','source_id','status','reason','version','source_date','created_at','keep_media','publish_target','published_at')}
+    value = {k:getattr(draft,k) for k in ('id','feed_id','source_id','status','reason','version','source_date','created_at','keep_media','automatic','publish_target','published_at')}
     value.update(message_ids=json.loads(draft.message_ids), media=media, sent_ids=json.loads(draft.sent_ids))
     value['excerpt'] = draft.original_text[:160]
     if detail: value.update(original_text=draft.original_text,body_html=draft.body_html)
@@ -107,7 +110,10 @@ async def save_feed(data:FeedInput, feed_id:int|None=None, db:Session=Depends(ge
         feed.source_id,feed.source_hash,feed.source_title = None,None,''
     if data.target_id and feed.source_id==data.target_id:
         raise HTTPException(422,'来源频道和发布频道需要分别设置')
-    for key,value in data.model_dump().items(): setattr(feed,key,value)
+    for key,value in data.model_dump().items():
+        if feed_id and key in ('auto_publish','template_title') and key not in data.model_fields_set:
+            continue  # Older clients omit the new options; preserve the saved mode.
+        setattr(feed,key,value)
     feed.enabled,feed.error = False,None
     if feed_id:
         feed.revision+=1
@@ -124,10 +130,11 @@ async def feed_action(feed_id:int,action:str):
         feed=required(db,ChannelFeed,feed_id)
         if action=='pause':
             feed.enabled=False;feed.revision+=1
+            db.query(ChannelDraft).filter(ChannelDraft.feed_id==feed_id,ChannelDraft.automatic.is_(True),ChannelDraft.status.in_(['queued','waiting'])).update(dict(status='draft',reason='自动发布已暂停，此帖保留在草稿'))
             return dict(ok=True)
         if action!='start': raise HTTPException(404)
         if feed.enabled: return dict(ok=True)
-        account_id,revision,source,target=feed.account_id,feed.revision,feed.source,feed.target_id
+        account_id,revision,source,target,automatic=feed.account_id,feed.revision,feed.source,feed.target_id,feed.auto_publish
     async with manager.account_lock(account_id):
         worker=manager.workers.get(account_id)
         with session_scope() as db:
@@ -138,6 +145,14 @@ async def feed_action(feed_id:int,action:str):
             if not getattr(entity,'broadcast',False): raise HTTPException(422,'来源需要选择频道，群组请使用监测转发')
             source_id=utils.get_peer_id(entity)
             if source_id==target: raise HTTPException(422,'来源频道和发布频道需要分别设置')
+            if automatic and target:
+                with session_scope() as db:
+                    if not available(db.get(Account,account_id),sending=True):raise HTTPException(422,'请开启账号发送权限，再启用自动发布')
+                destination=await asyncio.wait_for(worker.client.get_entity(target),READ_TIMEOUT)
+                rights=getattr(destination,'admin_rights',None)
+                if not getattr(destination,'broadcast',False):raise HTTPException(422,'发布目标需要选择频道')
+                if not (getattr(destination,'creator',False) or getattr(rights,'post_messages',False)):
+                    raise HTTPException(422,'请给当前账号目标频道的发布消息权限')
             latest=await asyncio.wait_for(worker.client.get_messages(entity,limit=1),READ_TIMEOUT)
         except HTTPException: raise
         except FloodWaitError as exc:
@@ -164,6 +179,22 @@ def filter_preview(data:FilterInput):
     return dict(accepted=reason is None,reason=reason or '进入待编辑草稿')
 
 
+class LayoutInput(BaseModel):
+    text: str = Field(default='',max_length=12000)
+    template_title: str = Field(default='曝光档案',min_length=1,max_length=60)
+    has_media: bool = Field(default=False,strict=True)
+
+
+@router.post('/api/channel-layout/preview')
+def layout_preview(data:LayoutInput):
+    title=data.template_title.strip()
+    if not title:raise HTTPException(422,'请填写模板标题')
+    body=format_channel_post(data.text,title,1,datetime.utcnow(),'https://t.me/qt00/1',data.has_media)
+    try:text,entities,clean=prepare_post(body,data.has_media,allow_split=True)
+    except ValueError as exc:raise HTTPException(422,str(exc))
+    return dict(html=clean,text=text,split_body=data.has_media and units(text)>1024,text_parts=len(list(split_post(text,entities))))
+
+
 @router.get('/api/channel-drafts')
 def drafts(status:Literal['draft','filtered','discarded','queued','sent','failed','unknown','all']='draft',feed_id:int|None=None,offset:int=Query(0,ge=0),db:Session=Depends(get_db)):
     query=db.query(ChannelDraft)
@@ -183,7 +214,7 @@ async def edit_draft(draft_id:int,data:DraftInput,db:Session=Depends(get_db)):
     draft=required(db,ChannelDraft,draft_id)
     if draft.version!=data.version: raise HTTPException(409,'草稿已变化，请重新打开后编辑')
     if draft.status not in ('draft','failed'): raise HTTPException(409,'当前状态仅支持查看，已排队的草稿请先取消发布')
-    try: _,_,clean=prepare_post(data.body_html,data.keep_media and bool(json.loads(draft.media)))
+    try: _,_,clean=prepare_post(data.body_html,data.keep_media and bool(json.loads(draft.media)),allow_split=True)
     except ValueError as exc:raise HTTPException(422,str(exc))
     draft.body_html,draft.keep_media,draft.status,draft.reason=clean,data.keep_media,'draft',None
     draft.version+=1
@@ -203,9 +234,18 @@ async def draft_action(draft_id:int,action:str,data:VersionInput,db:Session=Depe
         if feed.target_id==draft.source_id:raise HTTPException(422,'来源频道和发布频道需要分别设置')
         if draft.source_id!=feed.source_id:raise HTTPException(409,'来源频道已变化，请新建草稿')
         if not available(db.get(Account,feed.account_id),sending=True):raise HTTPException(422,'请检查发布账号是否登录、开启发送及是否处于平台等待')
-        try:prepare_post(draft.body_html,draft.keep_media and bool(json.loads(draft.media)))
+        try:prepare_post(draft.body_html,draft.keep_media and bool(json.loads(draft.media)),allow_split=True)
         except ValueError as exc:raise HTTPException(422,str(exc))
         draft.status,draft.publish_target,draft.due_at,draft.reason='queued',feed.target_id,datetime.utcnow(),None
+        draft.automatic,draft.config_revision=False,feed.revision
+    elif action=='format':
+        if draft.status not in ('draft','failed'):raise HTTPException(409,'仅可给尚未发布的草稿套用模板')
+        feed=required(db,ChannelFeed,draft.feed_id)
+        draft.body_html=format_channel_post(draft.original_text,feed.template_title,draft.id,draft.source_date,
+            source_link(feed.source,draft.source_id,json.loads(draft.message_ids)[0]),draft.keep_media and bool(json.loads(draft.media)))
+        try:prepare_post(draft.body_html,draft.keep_media and bool(json.loads(draft.media)),allow_split=True)
+        except ValueError as exc:raise HTTPException(422,str(exc))
+        draft.status,draft.reason,draft.automatic='draft',None,False
     elif action=='cancel':
         if draft.status not in ('queued','waiting'): raise HTTPException(409,'仅可取消尚未开始发送的草稿')
         draft.status,draft.reason='draft',None

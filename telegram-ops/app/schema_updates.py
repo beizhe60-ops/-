@@ -53,3 +53,20 @@ def add_message_copy_options(engine):
         for table in ("sender_bindings", "relay_jobs"):
             if "copy_options" not in {c["name"] for c in inspect(conn).get_columns(table)}:
                 ops.add_column(table, Column("copy_options", Text(), nullable=False, server_default="{}"))
+
+
+def add_channel_automation(engine):
+    """Additive migration: existing feeds stay manual and existing posts retain status."""
+    from sqlalchemy import Column, Boolean, String, Integer
+    columns = {
+        'channel_feeds': [Column('auto_publish', Boolean(), nullable=False, server_default='0'),
+                          Column('template_title', String(60), nullable=False, server_default='曝光档案')],
+        'channel_drafts': [Column('automatic', Boolean(), nullable=False, server_default='0'),
+                           Column('config_revision', Integer(), nullable=True)],
+    }
+    with engine.begin() as conn:
+        ops = Operations(MigrationContext.configure(conn))
+        for table, additions in columns.items():
+            existing = {c['name'] for c in inspect(conn).get_columns(table)}
+            for column in additions:
+                if column.name not in existing:ops.add_column(table,column)

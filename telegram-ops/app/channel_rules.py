@@ -29,7 +29,7 @@ def filter_post(text, exclude_terms, filter_ads, ad_terms):
     return None
 
 
-def prepare_post(markup, with_media=False):
+def prepare_post(markup, with_media=False, *, allow_split=False):
     parser = SafeHtml()
     parser.feed(markup)
     parser.close()
@@ -37,7 +37,7 @@ def prepare_post(markup, with_media=False):
         raise ValueError('文字格式没有正确闭合')
     clean = ''.join(parser.parts)
     text, entities = telegram_html.parse(clean)
-    limit = 1024 if with_media else 4096
+    limit = 20000 if allow_split else (1024 if with_media else 4096)
     if len(text.encode('utf-16-le')) // 2 > limit:
         raise ValueError(f'正文过长，当前格式上限为 {limit} 字符；请精简正文或移除原附件')
     if not text.strip() and not with_media:

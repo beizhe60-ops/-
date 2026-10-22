@@ -36,10 +36,11 @@ def init_db() -> None:
     from app import models, relay_models, channel_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
-    from app.schema_updates import allow_unconfigured_relay_target, add_task_deletion_marker, add_message_copy_options
+    from app.schema_updates import allow_unconfigured_relay_target, add_task_deletion_marker, add_message_copy_options, add_channel_automation
     allow_unconfigured_relay_target(engine)
     add_task_deletion_marker(engine)
     add_message_copy_options(engine)
+    add_channel_automation(engine)
     from app.account_settings import migrate_profiles
     with session_scope() as db:
         migrate_profiles(db)
