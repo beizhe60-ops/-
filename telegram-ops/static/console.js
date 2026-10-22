@@ -32,6 +32,7 @@ const titles = {
   guards: "不再联系",
   ai: "AI 群组分析",
   broadcasts: "群发任务",
+  channels: "频道采编",
   settings: "系统设置",
 };
 const labels = {
@@ -327,7 +328,7 @@ async function render({ background = false, revision = ++renderRevision } = {}) 
   let html;
   try {
     html = await (
-      { overview, accounts, tasks, records, guards, ai, broadcasts, settings }[page] || overview
+      { overview, accounts, tasks, records, guards, ai, broadcasts, channels, settings }[page] || overview
     )();
   } catch (e) {
     if (revision !== renderRevision) return;
@@ -737,6 +738,7 @@ function bindPage() {
       }),
   );
   bindWorkspace();
+  bindChannels();
   if ($("#password-form"))
     setupForm("#password-form", async (fd) => {
       await api("/password", "POST", Object.fromEntries(fd));

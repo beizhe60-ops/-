@@ -1,0 +1,13 @@
+/* The existing workspace palette stays consistent; editing uses an original/publish split. */
+.channel-filters{display:flex;align-items:end;flex-wrap:wrap;gap:16px;padding:18px 24px;border-bottom:1px solid var(--line)}
+.channel-filters label{min-width:150px;margin:0}.channel-filters select{margin-top:6px}.channel-filters>.subtle{padding-bottom:10px}
+.channel-excerpt{white-space:pre-wrap;overflow-wrap:anywhere;max-width:72ch;line-height:1.6}.channel-post>div:first-child,.channel-feed>div:first-child{min-width:0}.channel-post small,.channel-feed small{overflow-wrap:anywhere}
+.channel-pager{display:flex;justify-content:center;align-items:center;gap:18px;padding:18px}
+#modal.channel-dialog{width:min(1160px,96vw);max-width:1160px}.channel-draft-meta{display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:20px}
+.channel-edit-layout{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);gap:28px}.channel-edit-layout>*{min-width:0}.channel-edit-layout h3{margin-top:0}
+.channel-original{border-right:1px solid var(--line);padding-right:24px}.channel-original-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;font-size:14px;max-height:55vh;overflow:auto;padding-right:8px}
+.channel-media{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.channel-media figure{margin:0;max-width:145px}.channel-media img{display:block;width:130px;max-height:150px;object-fit:contain;border-radius:5px;background:var(--bg)}.channel-media figcaption{font-size:11px;color:var(--muted);padding-top:5px;overflow-wrap:anywhere}
+.channel-body{min-height:270px;max-height:55vh;overflow:auto;font-size:16px;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere}.channel-body[contenteditable=false]{background:var(--bg)}
+.channel-target{margin:22px 0 12px;padding:12px;background:var(--accent-light);overflow-wrap:anywhere}.channel-preview{padding:18px;border:1px solid var(--line);margin-top:18px;border-radius:8px}.channel-preview-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;margin-top:14px}
+.channel-edit-layout .form-footer{flex-wrap:wrap}.channel-edit-layout small{display:block;margin-top:10px}#channel-link-fields{margin:14px 0;padding:14px;background:var(--bg)}
+@media(max-width:850px){.channel-edit-layout{grid-template-columns:1fr;gap:22px}.channel-original{border-right:0;border-bottom:1px solid var(--line);padding:0 0 22px}.channel-original-text{max-height:220px}.channel-body{min-height:220px}.channel-filters{padding:16px;gap:10px}.channel-filters label{min-width:0;flex:1 1 130px}.channel-list-head{gap:12px}.channel-list-head h2{font-size:16px}.channel-post,.channel-feed{align-items:stretch}.channel-pager{gap:12px}.channel-edit-layout .form-footer button{flex:1 1 110px}}

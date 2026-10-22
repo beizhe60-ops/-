@@ -1,12 +1,13 @@
 /* Workflow UI. Uses the shared console API, escaping and modal helpers. */
 function workspaceHome() {
-  return heading("工作台", "选择要做的事情。群发、监测转发和 AI 分析分别管理。") +
+  return heading("工作台", "选择要做的事情。群发、监测转发、频道采编和 AI 分析分别管理。") +
     `<section class="workflow-menu">${[
       ["broadcasts", "群发任务", "把你编辑的通知发送到多个群。", "编辑内容 → 选择接收群 → 预览并启动", "↗"],
       ["tasks", "监测转发", "发现符合关键词的群消息，自动转发。", "选择来源群 → 设置关键词 → 选择转发群", "⇄"],
+      ["channels", "频道采编", "筛选来源频道的帖子，编辑后发布。", "配置来源 → 自动筛选 → 编辑草稿 → 确认发布", "▤"],
       ["ai", "AI 群组分析", "汇总群内聊天，定时发送重点摘要。", "选择分析群 → 设置摘要 → 选择接收人", "✦"]
     ].map(([path,title,desc,steps,icon]) => `<a class="workflow-entry" href="/console/${path}"><span class="workflow-icon">${icon}</span><div><h2>${title}</h2><p>${desc}</p><small>${steps}</small></div><span aria-hidden="true">›</span></a>`).join("")}</section>
-    <section class="panel"><div class="panel-head"><h2>开始使用</h2><a href="/console/accounts">账号管理</a></div><div class="panel-body"><ol class="checklist"><li><span class="check-number">1</span><div><strong>连接 Telegram 账号</strong><p>${state.accounts.filter(a=>a.has_session).length} 个账号已登录。三个模块共用已登录账号。</p></div></li><li><span class="check-number">2</span><div><strong>选择一个功能创建配置</strong><p>监测需要关键词；群发和 AI 分析不需要关键词。</p></div></li><li><span class="check-number">3</span><div><strong>预览后启用</strong><p>每项任务可单独暂停。右上角“暂停全部”会停止所有模块。</p></div></li></ol></div></section>` +
+    <section class="panel"><div class="panel-head"><h2>开始使用</h2><a href="/console/accounts">账号管理</a></div><div class="panel-body"><ol class="checklist"><li><span class="check-number">1</span><div><strong>连接 Telegram 账号</strong><p>${state.accounts.filter(a=>a.has_session).length} 个账号已登录。各功能共用已登录账号。</p></div></li><li><span class="check-number">2</span><div><strong>选择一个功能创建配置</strong><p>监测需要关键词；群发和 AI 分析不需要关键词。</p></div></li><li><span class="check-number">3</span><div><strong>预览后启用</strong><p>每项任务可单独暂停。右上角“暂停全部”会停止所有模块。</p></div></li></ol></div></section>` +
     `<section class="panel"><div class="panel-head"><h2>监测转发概况</h2><a href="/console/records">查看转发与私信记录</a></div><div class="panel-body"><p>已启用 ${state.tasks.filter(t=>t.enabled).length} 条监测任务 · 待处理 ${state.stats.pending} 条 · 失败或待核实 ${state.stats.failed} 条</p><p class="subtle">群发结果在群发任务内查看，摘要结果在 AI 群组分析内查看。</p></div></section>`;
 }
 

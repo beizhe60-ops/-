@@ -16,7 +16,7 @@ os.environ.update(
 @pytest.fixture(autouse=True)
 def database():
     from app.database import Base, engine
-    from app import models, relay_models
+    from app import models, relay_models, channel_models
 
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)

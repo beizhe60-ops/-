@@ -63,6 +63,8 @@ from app.broadcast import router as broadcast_router
 app.include_router(broadcast_router)
 from app.message_copy import router as copy_router
 app.include_router(copy_router)
+from app.channel_api import router as channel_router
+app.include_router(channel_router)
 
 
 PUBLIC_PATH_PREFIXES = ("/static", "/admin/login", "/favicon.ico")

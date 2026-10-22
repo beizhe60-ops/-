@@ -45,6 +45,7 @@ class RelayEngine:
         self.loop_task = None
         self.ai_task = None
         self.broadcast_task = None
+        self.channel_task = None
         self.ai_run_lock = asyncio.Lock()
         self.lock = asyncio.Lock()
         self.account_locks = {}
@@ -101,8 +102,11 @@ class RelayEngine:
                 )
             from app.broadcast import recover_broadcasts, broadcast_loop
             recover_broadcasts()
+            from app.channel_service import recover_channel_posts, channel_loop
+            recover_channel_posts()
             self.running = True
             self.broadcast_task = asyncio.create_task(broadcast_loop(self))
+            self.channel_task = asyncio.create_task(channel_loop(self))
             self.loop_task = asyncio.create_task(self.run())
             self.ai_task = asyncio.create_task(self.ai_summary_loop())
             from app.listener_poll import poll_loop
@@ -116,6 +120,8 @@ class RelayEngine:
                 tasks.append(self.loop_task)
             if self.broadcast_task:
                 tasks.append(self.broadcast_task)
+            if self.channel_task:
+                tasks.append(self.channel_task)
             if self.ai_task:
                 tasks.append(self.ai_task)
             if self.poll_task:
@@ -134,6 +140,7 @@ class RelayEngine:
             self.identities.clear()
             self.loop_task = None
             self.ai_task = None
+            self.channel_task = None
             self.poll_task = None
             self.poll_cursors.clear()
 

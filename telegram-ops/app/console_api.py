@@ -462,7 +462,7 @@ def register_monitor_scope(db, account_id, sources):
 @router.get("/console")
 @router.get("/console/{page}")
 def console_page(page: str = "overview"):
-    if page not in ("overview", "accounts", "tasks", "records", "guards", "ai", "broadcasts", "settings"):
+    if page not in ("overview", "accounts", "tasks", "records", "guards", "ai", "broadcasts", "channels", "settings"):
         raise HTTPException(404)
     return FileResponse("static/console.html")
 
