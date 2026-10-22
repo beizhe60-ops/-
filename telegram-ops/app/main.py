@@ -65,6 +65,9 @@ from app.message_copy import router as copy_router
 app.include_router(copy_router)
 from app.channel_api import router as channel_router
 app.include_router(channel_router)
+from app.console_health import router as health_router
+from app.console_metrics import RequestTimingMiddleware
+app.include_router(health_router)
 
 
 PUBLIC_PATH_PREFIXES = ("/static", "/admin/login", "/favicon.ico")
@@ -98,6 +101,8 @@ async def require_admin_auth(request: Request, call_next):
         return RedirectResponse(f"/admin/login?next={next_url}", status_code=303)
     return JSONResponse({"detail": "admin authentication required"}, status_code=401)
 
+
+app.add_middleware(RequestTimingMiddleware)
 
 def redirect(path: str) -> RedirectResponse:
     return RedirectResponse(path if path.startswith("/") and not path.startswith("//") and "\\" not in path else "/console", status_code=303)

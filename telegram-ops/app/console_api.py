@@ -260,15 +260,10 @@ async def test_ai_connection(data: AiConnectionInput, db: Session = Depends(get_
 @router.get("/api/ai/activity")
 def ai_activity(db: Session = Depends(get_db)):
     from datetime import timedelta
-    from zoneinfo import ZoneInfo
     config = ai_settings(db) or {}
-    now = datetime.now(ZoneInfo("Asia/Shanghai"))
-    next_at = None
-    if config.get("enabled") and config.get("trigger") == "schedule":
-        h, m = map(int, config.get("schedule_time", "23:00").split(":"))
-        next_at = now.replace(hour=h, minute=m, second=0, microsecond=0)
-        if next_at <= now:
-            next_at += timedelta(days=1)
+    from app.console_health import next_summary_at
+    last = db.get(ConsoleState, "ai_summary_last_run")
+    next_at = next_summary_at(config, last.value if last else "") if manager.running else None
     count = db.query(AiSummaryMessage).filter(
         AiSummaryMessage.account_id == config.get("account_id", 0),
         AiSummaryMessage.chat_id.in_(config.get("source_chat_ids", [])),

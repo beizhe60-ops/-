@@ -81,6 +81,8 @@ function api(path, method = "GET", body, options = {}) {
   return request;
 }
 async function requestApi(path, method = "GET", body, options = {}) {
+  const finishTiming=ConsoleTiming.start("api",path,method);
+  let requestSucceeded=false;
   // Only reads may time out here. Aborting a write does not undo server work.
   const controller = method === "GET" ? (options.controller || new AbortController()) : null;
   if (method !== "GET") writeRequests++;
@@ -106,11 +108,13 @@ async function requestApi(path, method = "GET", body, options = {}) {
     if (!res.ok)
       throw Error(typeof data.detail === "string"
         ? data.detail : JSON.stringify(data.detail || "请求失败"));
+    requestSucceeded=true;
     return data;
   } catch (e) {
     if (controller?.signal.aborted) throw Error("读取超时，请重试；当前页面内容已保留");
     throw e;
   } finally {
+    finishTiming(requestSucceeded);
     if (timeout !== null) clearTimeout(timeout);
     if (method !== "GET") writeRequests--;
   }
@@ -185,6 +189,8 @@ function setupForm(selector, callback) {
     const watched=watchedForms.get(f);
     let submitted;
     try {submitted=watched?formSnapshot(f,watched.extra):null;} catch(error){toast(error.message);return;}
+    const finishTiming=ConsoleTiming.start("save",f.id);
+    let saveSucceeded=false;
     const modalForm=!!f.closest("dialog");
     if(modalForm)f.inert=true;
     const button = e.submitter || f.querySelector("button[type=submit]");
@@ -194,11 +200,13 @@ function setupForm(selector, callback) {
     try {
       await callback(new FormData(f), f);
       savedForm(f,submitted);
+      saveSucceeded=true;
     } catch (ex) {
       f.querySelectorAll(".form-step").forEach(d=>d.open=true);
       if (err) err.textContent = ex.message;
       else toast(ex.message);
     } finally {
+      finishTiming(saveSucceeded);
       if(modalForm)f.inert=false;
       if (button) button.disabled = false;
     }
@@ -267,7 +275,7 @@ function tasksList() {
         "<button data-new-task>新建任务</button>",
       );
 }
-function overview() { return workspaceHome(); }
+function overview(options) { return workspaceHome(options); }
 function accounts() {
   const isMonitor=accountTab==='monitor',items=state.accounts.filter(a=>a.role===accountTab);
   const roleName=isMonitor?'监测账号':'私信账号';
@@ -604,6 +612,7 @@ function weightDialog(id) {
   });
 }
 function bindPage() {
+  bindObservability();
   $$("[data-receive-groups]").forEach(
     (b) =>
       (b.onclick = () => receiveGroupsDialog(Number(b.dataset.receiveGroups))),
@@ -777,9 +786,10 @@ setInterval(async () => {
   const revision = renderRevision;
   const requestedStateRevision = stateRevision;
   try {
-    const applied = await readState();
-    if (applied && page === "overview" && !$("#content button:disabled"))
-      await render({ background: true, revision });
+    const overviewRead=page === "overview";
+    const [applied,data] = await Promise.all([readState(),overviewRead?readOverview():Promise.resolve()]);
+    if (applied && overviewRead && page === "overview" && !$("#content button:disabled"))
+      await render({ background: true, revision, data });
   } catch (e) {
     if (requestedStateRevision !== stateRevision) return;
     // Notify once per outage, not every tick. A later successful read resets it.

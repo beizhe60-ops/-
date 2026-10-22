@@ -12,7 +12,7 @@ state.chats = Array.from({length:300},(_,i)=>({id:-(1001+i),account_id:1,title:'
 state.accounts[1].dm_copy_options = {format:'plain',image_id:null};
 let ai = {configured:true,enabled:false,account_id:1,source_chat_ids:[-1001],api_url:'https://example.test/v1/chat/completions',api_key_configured:true,model:'test-model',trigger:'schedule',target_type:'group',target_id:-1002,schedule_time:'23:00',message_count:50,trigger_count:50,lookback_hours:24};
 let feed = {id:1,name:'测试采集',account_id:1,source:'example_channel',source_id:-1001,source_title:'测试来源',target_id:-1002,exclude_terms:'广告',ad_terms:'广告合作',filter_ads:true,auto_publish:true,template_title:'曝光档案',emoji_style:'alert',body_format:'normal',enabled:false,revision:1,counts:{draft:1}};
-let customRecords=null, campaigns=[], guards=[];
+let customRecords=null, campaigns=[], guards=[], overviewOverride=null;
 const calls=[], gates=new Map(), failures=new Map();
 function holdNext(route) { let release,markStarted; const promise=new Promise(resolve=>release=resolve); const started=new Promise(resolve=>markStarted=resolve); const gate={promise,release,started,markStarted};gates.set(route,gate);return gate; }
 function failNext(route) { failures.set(route,true); }
@@ -34,6 +34,7 @@ const server=http.createServer(async(req,res)=>{
  if(failure){await pause(delay);event.end=Date.now();res.writeHead(503,{'Content-Type':'application/json'}).end(JSON.stringify({detail:'模拟请求失败'}));return;}
  let data;
  if(url.pathname==='/api/state') data=structuredClone(state);
+ else if(url.pathname==='/api/overview')data=overviewOverride||{checked_at:'2026-10-23T00:00:00Z',tasks:[{kind:'relay',id:1,name:'测试任务',status:'active',label:'运行中',last_received:'2026-10-23T00:00:00Z',last_success:null,failed:2,unknown:1,href:'/console/records?task_id=1',action:'查看记录'},{kind:'ai',id:0,name:'AI 群组摘要',status:'paused',label:'已暂停',last_received:null,last_success:null,href:'/console/ai',action:'查看分析结果'}],performance:{samples:3,rows:[{route:'GET /api/state',count:3,errors:0,p95_ms:12,max_ms:12}]}};
  else if(url.pathname==='/api/records')data=customRecords||{total:120,items:Array.from({length:50},(_,i)=>({id:i+1,task_id:1,stage:'relay',username:'example_user',source_title:'测试群',chat_id:-1001,text:'测试消息正文。'.repeat(100),original_text:'咨询',status:'sent',created_at:'2026-10-23T00:00:00'}))};
  else if(url.pathname==='/api/ai/settings'){if(req.method==='PUT')ai={...ai,...body};data=ai;}
  else if(url.pathname==='/api/ai/activity')data={collected:1,next_at:null,runs:[]};
@@ -57,4 +58,4 @@ const server=http.createServer(async(req,res)=>{
  res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));
 });
 
-module.exports={configure(data){customRecords=data.records;campaigns=data.campaigns||[];guards=data.guards||[];},server,state,calls,holdNext,failNext,delay,get ai(){return ai},get feed(){return feed}};
+module.exports={configure(data){overviewOverride=data.overview||null;customRecords=data.records;campaigns=data.campaigns||[];guards=data.guards||[];},server,state,calls,holdNext,failNext,delay,get ai(){return ai},get feed(){return feed}};

@@ -1,10 +1,12 @@
 /* Workflow UI. Uses the shared console API, escaping and modal helpers. */
-function workspaceHome() {
+function workspaceHome({data}={}) {
+  applyOverview(data);
   const connected=state.accounts.filter(a=>a.connected).length;
   const offline=state.accounts.filter(a=>!a.connected);
   return heading('工作台','先查看运行情况，再进入需要处理的任务。','<a class="button secondary" href="/console/records">查看消息记录</a>')+
     `<section class="home-status" aria-label="当前运行概况"><div><span class="status-dot ${state.running?'online':''}"></span><strong>${state.running?'后台服务运行中':'后台服务已暂停'}</strong><small>关闭网页不影响后台任务</small></div><a href="/console/accounts"><strong>${connected} / ${state.accounts.length}</strong><span>账号已连接</span></a><a href="/console/tasks"><strong>${state.tasks.filter(t=>t.enabled).length}</strong><span>监测任务已启用</span></a><a href="/console/records"><strong>${state.stats.pending||0}</strong><span>转发 / 私信待处理</span></a></section>
     ${(offline.length||state.stats.failed||!state.application?.configured)?`<section class="attention-list" aria-label="需要关注"><strong>需要关注</strong>${!state.application?.configured?'<a href="/console/settings">完成 Telegram 连接配置</a>':''}${offline.length?`<a href="/console/accounts">${offline.length} 个账号尚未连接，查看账号状态</a>`:''}${exceptionAttention()}</section>`:''}
+    ${healthPanel()}${performancePanel()}
     <div class="section-heading"><h2>常用功能</h2><span class="subtle">按要做的事情进入</span></div><section class="workflow-menu">${[
       ['broadcasts','群发任务','编辑通知，选择多个接收群，再预览发送。','↗'],
       ['tasks','监测转发','管理关键词转发，以及私信接收和文案。','⇄'],

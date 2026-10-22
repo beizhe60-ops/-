@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import json
 import logging
-from collections import deque
+from collections import deque, OrderedDict
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -55,12 +55,19 @@ class RelayEngine:
         self.last_send_account = 0
         self.last_connection_account = 0
         self.listener_diagnostics = {}
+        self.recent_receipts = OrderedDict()
         self.poll_task = None
         self.poll_cursors = {}
         self.poll_status = {}
 
     def note_message(self, account_id, event, outcome, task_id=None):
         """Bounded metadata only: no message text, usernames or login secrets."""
+        if outcome == "received" and (getattr(event, "is_group", False) or getattr(event, "is_channel", False)):
+            key = (account_id, event.chat_id)
+            self.recent_receipts[key] = datetime.utcnow().isoformat() + "Z"
+            self.recent_receipts.move_to_end(key)
+            if len(self.recent_receipts) > 1000:
+                self.recent_receipts.popitem(last=False)
         rows = self.listener_diagnostics.setdefault(account_id, deque(maxlen=100))
         rows.append(dict(at=datetime.utcnow().isoformat() + "Z", chat_id=event.chat_id,
                          message_id=event.id, task_id=task_id, outcome=outcome))

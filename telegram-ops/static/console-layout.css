@@ -204,3 +204,28 @@ dialog:has(.record-detail) { max-width:780px; }
  .record-filters { grid-template-columns:minmax(0,1fr); }
  .record-filters select { width:100%; max-width:none; }
 }
+
+/* Workbench health reads like a task list; timing detail stays folded by default. */
+.health-panel { margin-top:20px; }
+.health-panel .panel-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.health-row { display:grid; grid-template-columns:minmax(150px,1fr) minmax(160px,1.1fr) minmax(150px,1fr) minmax(150px,1fr) auto; gap:18px; padding:20px 24px; align-items:center; border-bottom:1px solid var(--line); }
+.health-row:last-child { border-bottom:0; }
+.health-name,.health-state,.health-time { min-width:0; }
+.health-name strong { overflow-wrap:anywhere; }
+.health-name small,.health-state small,.health-time span { display:block; font-size:12px; color:var(--muted); margin-top:5px; line-height:1.6; }
+.health-time strong { display:block; font-size:13px; font-weight:500; font-variant-numeric:tabular-nums; margin-top:5px; }
+.health-warning { display:block; font-size:12px; margin-top:8px; color:#a2442d; }
+.health-row .actions { flex-wrap:wrap; justify-content:flex-end; }
+.health-panel > .page-note { margin:0; padding:12px 24px 18px; }
+.health-panel .callout { margin:12px 24px; }
+.performance-panel { margin-top:16px; }
+.performance-panel > summary { padding:18px 24px; font-weight:600; cursor:pointer; }
+.performance-panel > summary small { font-weight:400; color:var(--muted); margin-left:12px; }
+.performance-content { padding:0 24px 20px; }
+.performance-content h3 { margin:20px 0 8px; font-size:15px; }
+.timing-scroll { overflow-x:auto; margin:12px 0; }
+.timing-table { font-variant-numeric:tabular-nums; }
+.timing-table td,.timing-table th { padding:10px 12px; }
+.timing-table td:first-child { overflow-wrap:anywhere; }
+@media(max-width:1200px) { .health-row { grid-template-columns:minmax(150px,1fr) minmax(150px,1fr); } .health-row .actions { grid-column:1/-1; justify-content:flex-start; } }
+@media(max-width:600px) { .health-row { padding:16px; gap:12px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); } .health-panel .panel-head,.performance-panel > summary { padding:16px; } .performance-panel > summary small { display:block; margin:6px 0 0; } .performance-content { padding:0 16px 16px; } .timing-table { min-width:540px; } .health-panel > .page-note { padding:12px 16px; } }

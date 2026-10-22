@@ -14,6 +14,7 @@ function channelPath({status=channelFilter,feed=channelFeedFilter,offset=channel
 }
 function readPageData(target, url) {
   switch(target) {
+    case 'overview': return readOverview();
     case 'records': return api(recordPath(url?recordQueryFromUrl(url):currentRecordQuery()));
     case 'guards': return api('/guards');
     case 'broadcasts': return api('/broadcasts');
@@ -80,6 +81,8 @@ async function navigateConsole(url, {pop=false}={}) {
   }
   if(!confirmLeave()){if(pop)history.pushState(null,'',displayedConsoleUrl);return;}
   if($('#modal').open)$('#modal').close();
+  const finishTiming=ConsoleTiming.start('navigation',target);
+  let navigationSucceeded=false;
   const previousPage=page;
   pageScroll.set(page,[scrollX,scrollY]);
   const revision=++renderRevision;
@@ -101,6 +104,7 @@ async function navigateConsole(url, {pop=false}={}) {
     if(revision!==renderRevision)return;
     if(!pop)history.pushState(null,'',url.pathname+url.search);
     displayedConsoleUrl=url.pathname+url.search;
+    navigationSucceeded=true;
     content.focus({preventScroll:true});
     window.scrollTo(...(pageScroll.get(target)||[0,0]));
   } catch(error) {
@@ -108,6 +112,7 @@ async function navigateConsole(url, {pop=false}={}) {
     page=previousPage;updateChrome();toast(error.message);
     if(pop)history.replaceState(null,'',displayedConsoleUrl);
   } finally {
+    finishTiming(navigationSucceeded);
     if(revision===renderRevision){navigationPending=false;content.inert=false;content.removeAttribute('aria-busy');if(state)serviceHeader();}
   }
 }
