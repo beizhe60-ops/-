@@ -54,7 +54,7 @@ function timingTable(rows, browser=false){
 }
 function performancePanel(){
   const server=overviewSnapshot?.performance;
-  return `<details class="panel performance-panel" id="performance-panel" ${performanceExpanded?'open':''}><summary>响应速度 <small>查看切页、保存和接口耗时</small></summary><div class="performance-content"><h3>当前页面会话</h3><p class="page-note">最近 200 次操作；刷新或关闭网页后清空。耗时从开始操作到页面更新或接口返回完成，包含网络等待。失败、取消或读取超时计入“未成功”，不等于发送失败。</p><div id="browser-timings">${timingTable(ConsoleTiming.groups(),true)}</div><button class="secondary small" id="refresh-browser-timings">更新本页统计</button><h3>服务器处理</h3><p class="page-note">最近 30 分钟，最多 1000 次接口请求；服务器重启后清空。${server?'当前 '+server.samples+' 个样本。':''}仅统计服务器处理时间，不含网络传输和网页绘制；少量样本仅供参考。运行概览自身不计入。</p>${overviewFailure?'<p class="page-note">统计读取失败，以下可能为旧数据。</p>':''}${timingTable(server?.rows||[])}<p class="page-note">统计只记录固定页面 / 接口名称、耗时和结果，不记录消息正文、查询内容或密钥。</p></div></details>`;
+  return `<details class="panel performance-panel" id="performance-panel" ${performanceExpanded?'open':''}><summary>响应速度 <small>查看切页、保存和接口耗时</small></summary><div class="performance-content"><h3>当前页面会话</h3><p class="page-note">最近 200 次操作；刷新或关闭网页后清空。耗时从开始操作到页面更新或接口返回完成，包含网络等待。失败、取消或读取超时计入“未成功”，不等于发送失败。</p><div id="browser-timings">${timingTable(ConsoleTiming.groups(),true)}</div><button class="secondary small" id="refresh-browser-timings">更新本页统计</button><h3>服务器处理</h3><p class="page-note" id="server-timing-note">最近 30 分钟，最多 1000 次接口请求；服务器重启后清空。${server?'当前 '+server.samples+' 个样本。':''}仅统计服务器处理时间，不含网络传输和网页绘制；少量样本仅供参考。运行概览自身不计入。</p><p class="page-note" id="server-timing-warning">${overviewFailure?'统计读取失败，以下可能为旧数据。':''}</p><div id="server-timings">${timingTable(server?.rows||[])}</div><p class="page-note">统计只记录固定页面 / 接口名称、耗时和结果，不记录消息正文、查询内容或密钥。</p></div></details>`;
 }
 async function readOverview(){
   try{return {snapshot:await api('/overview')};}catch(error){return {error:true};}
@@ -68,10 +68,44 @@ async function refreshOverview(){
   const revision=renderRevision;
   const result=await readOverview();
   if(page!=='overview'||revision!==renderRevision)return;
-  applyOverview(result);replaceRegion('#task-health-panel',healthPanel());replaceRegion('#performance-panel',performancePanel());
+  applyOverview(result);patchWorkbench(workspaceHome());if(button?.isConnected)button.disabled=false;
 }
 function bindObservability(){
   if($('#refresh-overview'))$('#refresh-overview').onclick=refreshOverview;
   if($('#refresh-browser-timings'))$('#refresh-browser-timings').onclick=()=>{$('#browser-timings').innerHTML=timingTable(ConsoleTiming.groups(),true);};
   const panel=$('#performance-panel');if(panel)panel.ontoggle=()=>{if(panel.isConnected)performanceExpanded=panel.open;};
+}
+
+// Home polling updates results in place. Keep buttons, expanded details and focus.
+function patchWorkbench(html) {
+  const template=document.createElement('template');template.innerHTML=html;
+  const next=template.content;
+  function region(selector,parentSelector,beforeSelector){
+    const old=document.querySelector(selector),fresh=next.querySelector(selector);
+    if(old&&fresh){if(old.innerHTML!==fresh.innerHTML)old.innerHTML=fresh.innerHTML;}
+    else if(old)old.remove();
+    else if(fresh){const parent=document.querySelector(parentSelector);parent?.insertBefore(fresh.cloneNode(true),beforeSelector?parent.querySelector(beforeSelector):null);}
+  }
+  region('.home-status');
+  region('.attention-list','#content','#task-health-panel');
+  const oldRows=document.querySelector('.health-rows'), newRows=next.querySelector('.health-rows');
+  if(oldRows&&newRows){
+    const key=row=>row.dataset.healthKind+':'+row.dataset.healthId;
+    const existing=new Map([...oldRows.children].map(row=>[key(row),row]));
+    [...newRows.children].forEach((fresh,index)=>{
+      const row=existing.get(key(fresh));
+      if(!row){oldRows.insertBefore(fresh.cloneNode(true),oldRows.children[index]||null);return;}
+      existing.delete(key(fresh));
+      for(let i=0;i<fresh.children.length;i++){
+        if(row.children[i]?.innerHTML!==fresh.children[i].innerHTML)row.children[i].innerHTML=fresh.children[i].innerHTML;
+      }
+      if(oldRows.children[index]!==row)oldRows.insertBefore(row,oldRows.children[index]||null);
+    });
+    existing.forEach(row=>row.remove());
+  }else region('.health-rows','#task-health-panel','.page-note');
+  region('#task-health-panel > .callout','#task-health-panel','.health-rows');
+  region('#task-health-panel > .page-note');
+  // Keep the local refresh button and details element; only their result regions change.
+  region('#server-timings');region('#server-timing-note');region('#server-timing-warning');
+  bindPage();
 }

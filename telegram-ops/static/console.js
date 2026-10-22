@@ -345,6 +345,9 @@ async function render({ background = false, revision = ++renderRevision, data } 
   // A response may arrive after an editor opens. Never replace its opener then.
   if (background && (document.hidden || $("#modal").open)) return;
   if (page === "overview" && html === renderedOverview) return;
+  if(background && page === "overview") {
+    patchWorkbench(html);renderedOverview=html;return;
+  }
   const active = document.activeElement;
   const focusAttribute = ["data-edit-task", "data-toggle-task", "data-new-task"]
     .find((name) => active?.hasAttribute(name));
