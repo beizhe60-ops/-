@@ -50,6 +50,11 @@ const server=http.createServer(async(req,res)=>{
  else if(url.pathname==='/api/channel-drafts')data={total:0,items:[]};
  else if(url.pathname==='/api/channel-feeds/1'){feed={...feed,...body,enabled:false,revision:feed.revision+1};data=feed;}
  else if(url.pathname==='/api/accounts/2/weight'){state.accounts[1].rotation_weight=body.weight;data={rotation_weight:body.weight};}
+ else if(/^\/api\/accounts\/\d+\/identity\/sync$/.test(url.pathname)){
+  const a=state.accounts.find(a=>a.id===Number(url.pathname.split('/')[3]));
+  const update={name:'同步名称 <img src=x onerror=alert(1)> 名称很长也应正常换行',label:a.label||a.name,username:'example_username_with_long_name',telegram_user_id:111,identity_synced_at:'2026-10-23T01:00:00Z'};
+  Object.assign(a,update);data=update;
+ }
  else if(url.pathname==='/api/tasks/1/toggle'){state.tasks[0].enabled=!state.tasks[0].enabled;data=state.tasks[0];}
  else if(url.pathname==='/api/tasks/1'){state.tasks[0]={...state.tasks[0],...body,enabled:false};data=state.tasks[0];}
  else {res.writeHead(404).end(JSON.stringify({detail:'Unexpected fixture route'}));return;}

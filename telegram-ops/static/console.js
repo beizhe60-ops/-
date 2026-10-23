@@ -283,7 +283,7 @@ function accounts() {
     `<div class="account-tabs" role="tablist" aria-label="账号类型">${[['monitor','监测账号'],['sender','私信账号']].map(([role,title])=>`<button role="tab" data-account-tab="${role}" aria-selected="${accountTab===role}" class="${accountTab===role?'selected':''}">${title}<span>${state.accounts.filter(a=>a.role===role).length}</span></button>`).join('')}</div>
     ${!state.application?.configured?'<div class="callout">首次使用请先在 <a href="/console/settings">系统设置</a> 完成 Telegram 连接配置。</div>':''}
     <section class="panel account-list"><div class="panel-head"><div><h2>${roleName}管理</h2><p class="subtle">${isMonitor?'供监测转发、频道采编和 AI 分析使用。':'接收群组、文案和权重统一在“监测转发 → 私信接收”设置。'}</p></div><span class="muted">${items.length} 个账号</span></div>
-    ${items.length?items.map(a=>`<article class="account-row" data-account-card="${a.id}"><div class="account-identity"><span class="account-avatar" aria-hidden="true">${isMonitor?'监':'私'}</span><div><h3>${E(a.name)}</h3><p class="phone">${E(a.phone)}</p></div></div><div class="account-connection">${badge(a.connected?'active':a.status,a.connected?'● 已连接':undefined)}${a.last_error?`<p class="error-text">${E(a.last_error)}</p>`:''}</div><label class="account-permission"><input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled?'checked':''}>${isMonitor?'允许发送消息':'允许发送私信'}</label><div class="account-actions"><a class="button secondary small" href="${accountTaskLink(a)}">${isMonitor?'查看关联任务':'管理私信接收'}</a>${!a.has_session?`<button class="small" data-login="${a.id}">继续登录</button>`:`<button class="text-button small" data-sync="${a.id}">更新群组列表</button><button class="text-button small danger" data-logout-account="${a.id}">退出账号</button>`}</div></article>`).join(''):empty('还没有'+roleName,'使用手机号、验证码和二级登录密码完成登录。',`<button id="empty-add-account">${roleName}登录</button>`)}</section>`;
+    ${items.length?items.map(a=>`<article class="account-row" data-account-card="${a.id}"><div class="account-identity"><span class="account-avatar" aria-hidden="true">${isMonitor?'监':'私'}</span><div><h3>${E(a.name)}</h3><p class="account-username">${a.username?"@"+E(a.username):(a.identity_synced_at?"未设置用户名":"资料待同步")}</p><p class="phone">${E(a.phone)}</p></div></div><div class="account-connection">${badge(a.connected?'active':a.status,a.connected?'● 已连接':undefined)}${a.identity_synced_at?`<p class="identity-sync-time">资料同步：${E(date(a.identity_synced_at))}</p>`:''}${a.last_error?`<p class="error-text">${E(a.last_error)}</p>`:''}</div><label class="account-permission"><input aria-label="${E(a.name)} 允许发送" class="toggle" type="checkbox" data-permission="${a.id}" data-kind="send_enabled" ${a.send_enabled?'checked':''}>${isMonitor?'允许发送消息':'允许发送私信'}</label><div class="account-actions"><a class="button secondary small" href="${accountTaskLink(a)}">${isMonitor?'查看关联任务':'管理私信接收'}</a>${!a.has_session?`<button class="small" data-login="${a.id}">继续登录</button>`:`<button class="text-button small" data-sync-identity="${a.id}">同步资料</button><button class="text-button small" data-sync="${a.id}">更新群组列表</button><button class="text-button small danger" data-logout-account="${a.id}">退出账号</button>`}</div></article>`).join(''):empty('还没有'+roleName,'使用手机号、验证码和二级登录密码完成登录。',`<button id="empty-add-account">${roleName}登录</button>`)}</section>`;
 }
 
 function tasks() {
@@ -669,6 +669,10 @@ function bindPage() {
   $$("[data-login]").forEach(
     (b) => (b.onclick = () => loginDialog(Number(b.dataset.login))),
   );
+  $$("[data-sync-identity]").forEach(b => {
+    b.onclick = () => action(b, () => api(`/accounts/${b.dataset.syncIdentity}/identity/sync`, "POST"),
+      "账号名字和用户名已同步", saved => updateAccountView(Number(b.dataset.syncIdentity), saved));
+  });
   $$("[data-sync]").forEach(
     (b) =>
       (b.onclick = () =>

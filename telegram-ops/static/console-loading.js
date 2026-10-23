@@ -44,7 +44,7 @@ function replaceRegion(selector, html) {
   const next=fragment.content.querySelector(selector);
   if(!next)return false;
   const active=previous.contains(document.activeElement)?document.activeElement:null;
-  const attrs=['data-toggle-task','data-edit-task','data-weight','data-permission','data-feed-edit'];
+  const attrs=['data-toggle-task','data-edit-task','data-weight','data-permission','data-feed-edit','data-sync-identity'];
   const attr=attrs.find(a=>active?.hasAttribute(a));
   const focus=attr?`[${attr}="${CSS.escape(active.getAttribute(attr))}"]`:null;
   previous.replaceWith(next);

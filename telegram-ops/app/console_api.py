@@ -21,6 +21,7 @@ from app.relay_models import (
     AiSummaryRun,
 )
 from app.account_settings import get_profile
+from app.account_identity import identities_for, display_fields, refresh_identity, IdentitySyncError
 from app.relay_logic import filter_message, format_relay, render_copy
 from app.message_copy import CopyInput, validate_copy
 from app.relay_engine import manager
@@ -45,7 +46,7 @@ def account_json(a: Account, db: Session) -> dict:
     profile = get_profile(db, a)
     binding = db.get(SenderBinding, a.id)
     weight = db.get(SenderWeight, a.id)
-    return account_payload(a, profile, binding, weight)
+    return account_payload(a, profile, binding, weight, identities_for(db, [a.id]).get(a.id))
 
 
 def account_payload(
@@ -53,6 +54,7 @@ def account_payload(
     profile: AccountProfile,
     binding: SenderBinding | None,
     weight: SenderWeight | None,
+    identity: dict | None = None,
 ) -> dict:
     connected = a.id in manager.workers and manager.workers[a.id].client.is_connected()
     return dict(
@@ -63,7 +65,7 @@ def account_payload(
         rotation_weight=weight.weight if weight else 1,
         monitor_chat_ids=json.loads(profile.monitor_chat_ids),
         id=a.id,
-        name=a.name,
+        **display_fields(a, identity),
         phone=a.phone,
         status=a.status,
         connected=connected,
@@ -84,7 +86,8 @@ def accounts_json(accounts: list[Account], db: Session) -> list[dict]:
         return [account_json(a, db) for a in accounts]
     bindings = {b.account_id: b for b in db.query(SenderBinding).all()}
     weights = {w.account_id: w for w in db.query(SenderWeight).all()}
-    return [account_payload(a, profiles[a.id], bindings.get(a.id), weights.get(a.id))
+    identities = identities_for(db, [a.id for a in accounts])
+    return [account_payload(a, profiles[a.id], bindings.get(a.id), weights.get(a.id), identities.get(a.id))
             for a in accounts]
 
 
@@ -606,6 +609,24 @@ async def sync(id: int, db: Session = Depends(get_db)):
     return {"ok": True, "message": f"已同步 {count} 个群组或频道"}
 
 
+@router.post("/api/accounts/{id}/identity/sync")
+async def sync_identity(id: int, db: Session = Depends(get_db)):
+    account = required(db, Account, id)
+    lock = manager.account_lock(id)
+    if lock.locked():
+        raise HTTPException(409, "当前账号正在处理任务，请稍后同步资料")
+    async with lock:
+        worker = manager.workers.get(id)
+        client = worker.client if worker and worker.client.is_connected() else None
+        try:
+            identity = await refresh_identity(id, client)
+        except IdentitySyncError as exc:
+            raise HTTPException(400, str(exc))
+        except Exception as exc:
+            raise HTTPException(400, "同步资料失败：" + login_error(exc))
+    return display_fields(account, identity)
+
+
 @router.get("/api/accounts/{id}/listener")
 def listener_diagnostics(id: int, db: Session = Depends(get_db)):
     required(db, Account, id)
@@ -814,19 +835,13 @@ async def cancel(id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/api/service/{action}")
-async def service(action: str, db: Session = Depends(get_db)):
+async def service(action: str):
     if action not in ("start", "stop"):
         raise HTTPException(404)
     if action == "start":
-        await manager.start()
+        await manager.start(persist=True)
     else:
-        await manager.stop()
-    row = db.get(ConsoleState, "running")
-    if not row:
-        row = ConsoleState(key="running", value="false")
-        db.add(row)
-    row.value = "true" if action == "start" else "false"
-    db.commit()
+        await manager.stop(persist=True)
     return {"ok": True, "running": manager.running}
 
 

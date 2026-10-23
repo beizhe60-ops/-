@@ -231,13 +231,13 @@ async def account_sync_chats(account_id: int):
 
 @app.post("/workers/start")
 async def workers_start():
-    await manager.start()
+    await manager.start(persist=True)
     return redirect("/")
 
 
 @app.post("/workers/stop")
 async def workers_stop():
-    await manager.stop()
+    await manager.stop(persist=True)
     return redirect("/")
 
 

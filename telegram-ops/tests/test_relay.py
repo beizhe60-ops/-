@@ -286,7 +286,7 @@ def test_two_step_login_resumes_without_reusing_code(monkeypatch):
         asyncio.run(workers.verify_login_code(1, "12345"))
     with session_scope() as db:
         assert db.get(ConsoleState, "login_2fa:1") is not None
-    client.sign_in = AsyncMock()
+    client.sign_in = AsyncMock(return_value=SimpleNamespace(id=123, first_name="测试", last_name=None, username="example_account"))
     asyncio.run(workers.verify_login_code(1, "12345", "correct-password"))
     client.sign_in.assert_awaited_once_with(password="correct-password")
     with session_scope() as db:

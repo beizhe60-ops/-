@@ -444,17 +444,17 @@ async def verify_login_code(account_id: int, code: str, password: str | None = N
         if needs_password:
             if not password:
                 raise TwoStepPasswordRequired("two-step password is required")
-            await client.sign_in(password=password)
+            user = await client.sign_in(password=password)
         else:
             try:
-                await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
+                user = await client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
             except SessionPasswordNeededError:
                 if not password:
                     with session_scope() as db:
                         db.merge(ConsoleState(key=key, value="true"))
                         db.get(Account, account_id).login_temp_session_string_encrypted = encrypt_text(StringSession.save(client.session))
                     raise TwoStepPasswordRequired("two-step password is required")
-                await client.sign_in(password=password)
+                user = await client.sign_in(password=password)
         with session_scope() as db:
             flag = db.get(ConsoleState, key)
             if flag:
@@ -462,6 +462,8 @@ async def verify_login_code(account_id: int, code: str, password: str | None = N
         session_string = StringSession.save(client.session)
         with session_scope() as db:
             account = db.get(Account, account_id)
+            from app.account_identity import save_identity
+            save_identity(db, account_id, user)
             account.session_string_encrypted = encrypt_text(session_string)
             account.login_temp_session_string_encrypted = None
             account.phone_code_hash = None

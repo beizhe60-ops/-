@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import sqlite3
 from collections import deque, OrderedDict
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -31,6 +32,23 @@ from app.ai_summary import request_summary
 log = logging.getLogger(__name__)
 
 MAX_ACCOUNT_OPERATIONS = 4
+
+
+class EnqueueStorageError(RuntimeError):
+    """A redacted write failure; SQL parameters and message bodies stay private."""
+
+
+def is_relay_event_duplicate(exc):
+    original = exc.orig
+    if isinstance(original, sqlite3.IntegrityError):
+        return (getattr(original, "sqlite_errorcode", None) == sqlite3.SQLITE_CONSTRAINT_UNIQUE
+                and str(original) == "UNIQUE constraint failed: relay_jobs.task_id, relay_jobs.stage, relay_jobs.chat_id, relay_jobs.message_id")
+    return getattr(getattr(original, "diag", None), "constraint_name", None) == "uq_relay_event"
+
+
+def persist_running_intent(running):
+    with session_scope() as db:
+        db.merge(ConsoleState(key="running", value="true" if running else "false"))
 
 
 class SummaryDeliveryError(ValueError):
@@ -98,8 +116,12 @@ class RelayEngine:
     def account_lock(self, account_id):
         return self.account_locks.setdefault(account_id, asyncio.Lock())
 
-    async def start(self):
+    async def start(self, *, persist=False):
         async with self.lifecycle_lock:
+            # Explicit user commands persist intent under the lifecycle lock.
+            # Startup recovery and process shutdown never overwrite that intent.
+            if persist:
+                persist_running_intent(True)
             if self.running:
                 return
             # A crash after sending may precede the local commit: never retry blindly.
@@ -119,8 +141,10 @@ class RelayEngine:
             from app.listener_poll import poll_loop
             self.poll_task = asyncio.create_task(poll_loop(self))
 
-    async def stop(self):
+    async def stop(self, *, persist=False):
         async with self.lifecycle_lock:
+            if persist:
+                persist_running_intent(False)
             self.running = False
             tasks = list(self.send_tasks.values()) + list(self.connection_tasks.values())
             if self.loop_task:
@@ -242,6 +266,8 @@ class RelayEngine:
                         "active", "flood_wait", "connection_error"
                     ) and current.session_string_encrypted == account.session_string_encrypted
                     if valid:
+                        from app.account_identity import save_identity
+                        save_identity(db, account_id, me)
                         current.status = "active"
                         current.last_error = None
                         current.last_health_check_at = datetime.utcnow()
@@ -677,8 +703,13 @@ class RelayEngine:
                         copy_options=json.dumps(copy_options),
                     )
                 )
-        except IntegrityError:
-            pass  # Same Telegram event after reconnect: already handled.
+        except IntegrityError as exc:
+            if is_relay_event_duplicate(exc):
+                return  # Only the same durable event is safe to ignore.
+            log.error("Relay enqueue constraint failure: task=%s stage=%s account=%s chat=%s message=%s",
+                      task.id, stage, account_id, chat_id, message_id)
+            # Handler/poll diagnostics report failure without logging SQL parameters.
+            raise EnqueueStorageError("消息入队失败：数据库约束异常，请检查服务日志") from None
 
     @staticmethod
     def receives(db, account_id, chat_id):
