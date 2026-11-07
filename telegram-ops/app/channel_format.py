@@ -60,7 +60,10 @@ def format_channel_post(text, title, case_id, source_date, url, has_media=False,
     when=source_date.replace(tzinfo=timezone.utc) if source_date.tzinfo is None else source_date
     date=when.astimezone(ZoneInfo('Asia/Shanghai')).strftime('%Y.%m.%d')
     icons = STYLE_ICONS[emoji_style]
-    parts=[f'{icons[0]}<b>{html.escape(title)}</b>\n{date} · #曝光记录']
+    # Derive the tag from the same title; punctuation/emoji must not break it.
+    hashtag = re.sub(r'[^\w]+', '_', title).strip('_')
+    metadata = date + (' · #' + hashtag if hashtag else '')
+    parts=[f'{icons[0]}<b>{html.escape(title)}</b>\n{metadata}']
     if narrative:
         content = html.escape(narrative)
         tag = BODY_TAGS.get(body_format)

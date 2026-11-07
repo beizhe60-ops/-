@@ -15,6 +15,22 @@ from test_console_api import login, HEAD
 from test_channel_editor import fixture_feed, message, fake_engine, make_draft, TARGET
 
 
+@pytest.mark.parametrize('title,tag',[
+    ('供需信息','#供需信息'),
+    ('曝光档案','#曝光档案'),
+    ('📦 供需 / 信息 2026','#供需_信息_2026'),
+    ('Supply & Demand','#Supply_Demand'),
+    ('#供需信息','#供需信息'),
+    ('📦 !!!',''),
+])
+def test_generated_hashtag_follows_title(title,tag):
+    markup=format_channel_post('原帖正文',title,1,datetime(2026,11,8),'',emoji_style='minimal')
+    text,_,_=prepare_post(markup)
+    assert text.splitlines()[0]==title
+    assert text.splitlines()[1]=='2026.11.08'+(' · '+tag if tag else '')
+    assert '#曝光记录' not in text
+
+
 @pytest.mark.parametrize('style,icon',[('alert','⚠️'),('lively','🚨'),('minimal','曝光档案')])
 @pytest.mark.parametrize('fmt,entity',[
     ('normal',None),('bold',types.MessageEntityBold),('italic',types.MessageEntityItalic),
@@ -54,11 +70,12 @@ def test_unsupported_markup_rejected(markup):
     with pytest.raises(ValueError):prepare_post(markup)
 
 
-def test_preferences_saved_used_in_new_posts_and_preserved_for_legacy_client():
+@pytest.mark.parametrize('title',['供需信息','曝光档案'])
+def test_preferences_saved_used_in_new_posts_and_preserved_for_legacy_client(title):
     fid=fixture_feed()
     with TestClient(app) as c:
         login(c)
-        data=dict(name='采集',account_id=1,source='qt00',target_id=TARGET,auto_publish=True,emoji_style='lively',body_format='quote')
+        data=dict(name='采集',account_id=1,source='qt00',target_id=TARGET,auto_publish=True,template_title=title,emoji_style='lively',body_format='quote')
         assert c.put(f'/api/channel-feeds/{fid}',json=data,headers=HEAD).status_code==200
         legacy=dict(name='采集',account_id=1,source='qt00',target_id=TARGET)
         assert c.put(f'/api/channel-feeds/{fid}',json=legacy,headers=HEAD).status_code==200
@@ -70,7 +87,8 @@ def test_preferences_saved_used_in_new_posts_and_preserved_for_legacy_client():
         d=db.query(ChannelDraft).one();assert d.status=='queued' and '<blockquote>事件正文😀</blockquote>' in d.body_html
     e,client=fake_engine();asyncio.run(publish_next(e,1))
     call=client.send_message.call_args
-    assert '🚨 曝光档案' in call.args[1] and '#0001' not in call.args[1]
+    assert '🚨 '+title in call.args[1] and '#0001' not in call.args[1]
+    assert ' · #'+title in call.args[1] and '#曝光记录' not in call.args[1]
     assert any(isinstance(x,types.MessageEntityBlockquote) for x in call.kwargs['formatting_entities'])
 
 
@@ -81,6 +99,7 @@ def test_preview_and_draft_edit_preserve_formats_without_publication():
         sample=dict(text='测试正文😀',template_title='自定义',emoji_style='minimal',body_format='spoiler')
         result=c.post('/api/channel-layout/preview',json=sample,headers=HEAD).json()
         assert result['html'].startswith('<b>自定义</b>') and '<tg-spoiler>测试正文😀</tg-spoiler>' in result['html']
+        assert ' · #自定义' in result['text'] and '#曝光记录' not in result['text']
         markup='<blockquote><b>事件</b>\n原文</blockquote>\n<code>123456</code> <tg-spoiler>隐藏😀</tg-spoiler>\n<del>修订</del> 2026-10-23 12:30'
         saved=c.put(f'/api/channel-drafts/{did}',json=dict(version=1,body_html=markup,keep_media=False),headers=HEAD)
         assert saved.status_code==200 and saved.json()['body_html']==markup and saved.json()['status']=='draft'

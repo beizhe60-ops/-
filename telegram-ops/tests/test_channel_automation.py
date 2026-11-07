@@ -171,12 +171,15 @@ def test_enabling_auto_verifies_target_permissions_and_no_send():
 
 def test_layout_preview_does_not_change_or_publish_and_format_existing_is_manual():
     did=make_draft()
+    with session_scope() as db:db.get(ChannelFeed,1).template_title='供需信息'
     with TestClient(app) as c:
         login(c)
         r=c.post('/api/channel-layout/preview',json=dict(text='原始经过\n👤 123456789\n👦🏻 用户\n🌐 @example_person',template_title='自定义档案'),headers=HEAD)
         assert r.status_code==200 and '自定义档案' in r.json()['text']
         d=c.post(f'/api/channel-drafts/{did}/format',json=dict(version=1),headers=HEAD).json()
         assert d['status']=='draft' and not d['automatic'] and '<b>事件经过</b>' in d['body_html']
+        assert '<b>供需信息</b>' in d['body_html'] and ' · #供需信息' in d['body_html']
+        assert '#曝光记录' not in d['body_html']
     with session_scope() as db:assert db.query(ChannelDraft).count()==1
 
 
